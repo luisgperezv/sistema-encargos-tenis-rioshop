@@ -1,5 +1,19 @@
+# Entorno virtual
+venv/
 backend/venv/
+
+# Python
 __pycache__/
 *.pyc
+
+# Base de datos
+*.db
+
+# Variables de entorno
 .env
+
+# VS Code
+.vscode/
+
+# Mac (por si acaso)
 .DS_Store
