@@ -4,8 +4,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.encargo import Encargo
 from app.models.cliente import Cliente
-from app.schemas.encargo import EncargoCreate, EncargoResponse, EncargoEstadoUpdate
-
+from app.schemas.encargo import EncargoCreate, EncargoResponse, EncargoEstadoUpdate, EncargoAbonoUpdate
 router = APIRouter()
 
 
@@ -77,13 +76,41 @@ def eliminar_encargo(encargo_id: int, db: Session = Depends(get_db)):
 
 @router.put("/encargos/{encargo_id}/estado", response_model=EncargoResponse)
 def actualizar_estado(encargo_id: int, data: EncargoEstadoUpdate, db: Session = Depends(get_db)):
-    
     encargo = db.query(Encargo).filter(Encargo.id == encargo_id).first()
 
     if not encargo:
         raise HTTPException(status_code=404, detail="El encargo no existe")
 
+    if data.estado == "entregado" and encargo.saldo > 0:
+        raise HTTPException(
+            status_code=400,
+            detail="No se puede entregar un encargo con saldo pendiente"
+        )
+
     encargo.estado = data.estado
+
+    db.commit()
+    db.refresh(encargo)
+
+    return encargo
+
+@router.put("/encargos/{encargo_id}/abono", response_model=EncargoResponse)
+def actualizar_abono(encargo_id: int, data: EncargoAbonoUpdate, db: Session = Depends(get_db)):
+    encargo = db.query(Encargo).filter(Encargo.id == encargo_id).first()
+
+    if not encargo:
+        raise HTTPException(status_code=404, detail="El encargo no existe")
+
+    if data.abono <= 0:
+        raise HTTPException(status_code=400, detail="El nuevo abono debe ser mayor que 0")
+
+    nuevo_total_abonado = encargo.abono + data.abono
+
+    if nuevo_total_abonado > encargo.precio:
+        raise HTTPException(status_code=400, detail="El abono supera el precio total del encargo")
+
+    encargo.abono = nuevo_total_abonado
+    encargo.saldo = encargo.precio - encargo.abono
 
     db.commit()
     db.refresh(encargo)

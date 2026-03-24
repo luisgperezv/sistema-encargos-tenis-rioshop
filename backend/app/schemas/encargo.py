@@ -44,3 +44,6 @@ class EncargoResponse(BaseModel):
 
 class EncargoEstadoUpdate(BaseModel):
     estado: str
+
+class EncargoAbonoUpdate(BaseModel):
+    abono: float
