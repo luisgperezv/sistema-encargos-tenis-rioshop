@@ -81,6 +81,14 @@ def actualizar_estado(encargo_id: int, data: EncargoEstadoUpdate, db: Session = 
     if not encargo:
         raise HTTPException(status_code=404, detail="El encargo no existe")
 
+    estados_validos = ["pendiente", "pedido", "despachado", "en_local", "entregado", "cancelado"]
+
+    if data.estado not in estados_validos:
+        raise HTTPException(
+            status_code=400,
+            detail="Estado no válido"
+        )
+
     if data.estado == "entregado" and encargo.saldo > 0:
         raise HTTPException(
             status_code=400,
