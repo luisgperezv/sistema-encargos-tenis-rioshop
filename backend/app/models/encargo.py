@@ -1,5 +1,7 @@
 from sqlalchemy import Column, Integer, String, Float, ForeignKey
+from sqlalchemy.orm import relationship
 from app.database import Base
+
 
 class Encargo(Base):
     __tablename__ = "encargos"
@@ -25,3 +27,5 @@ class Encargo(Base):
     fecha_entrega_estimada = Column(String, nullable=True)
 
     observaciones = Column(String, nullable=True)
+
+    cliente = relationship("Cliente", back_populates="encargos")
