@@ -18,7 +18,6 @@ class EncargoCreate(BaseModel):
     foto: str
     precio: float
     abono: float = 0
-    fecha_creacion: str
     fecha_entrega_estimada: str | None = None
     observaciones: str | None = None
 
@@ -47,3 +46,12 @@ class EncargoEstadoUpdate(BaseModel):
 
 class EncargoAbonoUpdate(BaseModel):
     abono: float
+
+class EncargoUpdate(BaseModel):
+    referencia: str
+    talla_eur: str
+    talla_col: str
+    foto: str
+    precio: float
+    fecha_entrega_estimada: str | None = None
+    observaciones: str | None = None
