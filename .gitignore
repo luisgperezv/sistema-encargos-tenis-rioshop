@@ -1,19 +1,30 @@
-# Entorno virtual
+# Entornos virtuales
 venv/
 backend/venv/
 
 # Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 
 # Base de datos
 *.db
+*.sqlite3
 
 # Variables de entorno
 .env
+*.env
+
+# Archivos subidos
+uploads/
+backend/uploads/
+
+# Logs
+*.log
 
 # VS Code
 .vscode/
 
-# Mac (por si acaso)
+# Sistema
 .DS_Store
