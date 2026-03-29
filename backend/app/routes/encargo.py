@@ -4,6 +4,7 @@ from sqlalchemy import or_, String
 import shutil
 import os
 import uuid
+from app.core.security import get_current_user
 
 from datetime import date
 from app.database import get_db
@@ -14,6 +15,32 @@ router = APIRouter()
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 UPLOADS_DIR = os.path.join(BASE_DIR, "uploads")
+
+ESTADOS_VALIDOS = [
+    "pendiente",
+    "pedido",
+    "despachado",
+    "en_local",
+    "entregado",
+    "cancelado"
+]
+
+def validar_finanzas(precio: float, abono: float):
+    if precio <= 0:
+        raise HTTPException(status_code=400, detail="El precio debe ser mayor a 0")
+
+    if abono < 0:
+        raise HTTPException(status_code=400, detail="El abono no puede ser negativo")
+
+    if abono > precio:
+        raise HTTPException(status_code=400, detail="El abono no puede ser mayor que el precio")
+
+    saldo = precio - abono
+
+    if saldo < 0:
+        raise HTTPException(status_code=400, detail="El saldo no puede ser negativo")
+
+    return saldo
 
 
 @router.post("/upload")
@@ -38,22 +65,17 @@ def subir_imagen(file: UploadFile = File(...)):
     }
 
 @router.post("/encargos", response_model=EncargoResponse)
-def crear_encargo(encargo: EncargoCreate, db: Session = Depends(get_db)):
+def crear_encargo(
+    encargo: EncargoCreate,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
     cliente = db.query(Cliente).filter(Cliente.id == encargo.cliente_id).first()
 
     if not cliente:
         raise HTTPException(status_code=404, detail="El cliente no existe")
 
-    if encargo.precio < 0:
-        raise HTTPException(status_code=400, detail="El precio no puede ser negativo")
-
-    if encargo.abono < 0:
-        raise HTTPException(status_code=400, detail="El abono no puede ser negativo")
-
-    if encargo.abono > encargo.precio:
-        raise HTTPException(status_code=400, detail="El abono no puede ser mayor que el precio")
-
-    saldo = encargo.precio - encargo.abono
+    saldo = validar_finanzas(encargo.precio, encargo.abono)
 
     nuevo_encargo = Encargo(
         cliente_id=encargo.cliente_id,
@@ -82,7 +104,8 @@ def crear_encargo(encargo: EncargoCreate, db: Session = Depends(get_db)):
 def listar_encargos(
     estado: str | None = Query(default=None),
     buscar: str | None = Query(default=None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
 ):
     query = db.query(Encargo).join(Cliente)
 
@@ -103,7 +126,11 @@ def listar_encargos(
 
 
 @router.get("/encargos/{encargo_id}", response_model=EncargoResponse)
-def obtener_encargo(encargo_id: int, db: Session = Depends(get_db)):
+def obtener_encargo(
+    encargo_id: int,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
     encargo = db.query(Encargo).filter(Encargo.id == encargo_id).first()
 
     if not encargo:
@@ -111,14 +138,8 @@ def obtener_encargo(encargo_id: int, db: Session = Depends(get_db)):
 
     return encargo
 
-    db.add(nuevo_encargo)
-    db.commit()
-    db.refresh(nuevo_encargo)
-
-    return nuevo_encargo
-
 @router.delete("/encargos/{encargo_id}")
-def eliminar_encargo(encargo_id: int, db: Session = Depends(get_db)):
+def eliminar_encargo(encargo_id: int, db: Session = Depends(get_db), current_user: str = Depends(get_current_user)):
     encargo = db.query(Encargo).filter(Encargo.id == encargo_id).first()
 
     if not encargo:
@@ -130,15 +151,13 @@ def eliminar_encargo(encargo_id: int, db: Session = Depends(get_db)):
     return {"mensaje": "Encargo eliminado correctamente"}
 
 @router.put("/encargos/{encargo_id}/estado", response_model=EncargoResponse)
-def actualizar_estado(encargo_id: int, data: EncargoEstadoUpdate, db: Session = Depends(get_db)):
+def actualizar_estado(encargo_id: int, data: EncargoEstadoUpdate, db: Session = Depends(get_db), current_user: str = Depends(get_current_user)):
     encargo = db.query(Encargo).filter(Encargo.id == encargo_id).first()
 
     if not encargo:
         raise HTTPException(status_code=404, detail="El encargo no existe")
 
-    estados_validos = ["pendiente", "pedido", "despachado", "en_local", "entregado", "cancelado"]
-
-    if data.estado not in estados_validos:
+    if data.estado not in ESTADOS_VALIDOS:
         raise HTTPException(
             status_code=400,
             detail="Estado no válido"
@@ -158,7 +177,12 @@ def actualizar_estado(encargo_id: int, data: EncargoEstadoUpdate, db: Session = 
     return encargo
 
 @router.put("/encargos/{encargo_id}/abono", response_model=EncargoResponse)
-def actualizar_abono(encargo_id: int, data: EncargoAbonoUpdate, db: Session = Depends(get_db)):
+def actualizar_abono(
+    encargo_id: int,
+    data: EncargoAbonoUpdate,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
     encargo = db.query(Encargo).filter(Encargo.id == encargo_id).first()
 
     if not encargo:
@@ -168,12 +192,10 @@ def actualizar_abono(encargo_id: int, data: EncargoAbonoUpdate, db: Session = De
         raise HTTPException(status_code=400, detail="El nuevo abono debe ser mayor que 0")
 
     nuevo_total_abonado = encargo.abono + data.abono
-
-    if nuevo_total_abonado > encargo.precio:
-        raise HTTPException(status_code=400, detail="El abono supera el precio total del encargo")
+    saldo = validar_finanzas(encargo.precio, nuevo_total_abonado)
 
     encargo.abono = nuevo_total_abonado
-    encargo.saldo = encargo.precio - encargo.abono
+    encargo.saldo = saldo
 
     db.commit()
     db.refresh(encargo)
@@ -181,7 +203,12 @@ def actualizar_abono(encargo_id: int, data: EncargoAbonoUpdate, db: Session = De
     return encargo
 
 @router.put("/encargos/{encargo_id}", response_model=EncargoResponse)
-def editar_encargo(encargo_id: int, data: EncargoUpdate, db: Session = Depends(get_db)):
+def editar_encargo(
+    encargo_id: int,
+    data: EncargoUpdate,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
     encargo = db.query(Encargo).filter(Encargo.id == encargo_id).first()
 
     if not encargo:
@@ -190,14 +217,7 @@ def editar_encargo(encargo_id: int, data: EncargoUpdate, db: Session = Depends(g
     if encargo.estado == "entregado":
         raise HTTPException(status_code=400, detail="No se puede editar un encargo entregado")
 
-    if data.precio < 0:
-        raise HTTPException(status_code=400, detail="El precio no puede ser negativo")
-
-    if data.precio < encargo.abono:
-        raise HTTPException(
-            status_code=400,
-            detail="El nuevo precio no puede ser menor que el abono acumulado"
-        )
+    saldo = validar_finanzas(data.precio, encargo.abono)
 
     encargo.referencia = data.referencia
     encargo.talla_eur = data.talla_eur
@@ -206,8 +226,7 @@ def editar_encargo(encargo_id: int, data: EncargoUpdate, db: Session = Depends(g
     encargo.precio = data.precio
     encargo.fecha_entrega_estimada = data.fecha_entrega_estimada
     encargo.observaciones = data.observaciones
-
-    encargo.saldo = encargo.precio - encargo.abono
+    encargo.saldo = saldo
 
     db.commit()
     db.refresh(encargo)

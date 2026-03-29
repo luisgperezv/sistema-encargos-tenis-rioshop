@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from app.core.security import get_current_user
 
 from app.database import get_db
 from app.models.cliente import Cliente
@@ -9,7 +10,11 @@ router = APIRouter()
 
 
 @router.post("/clientes", response_model=ClienteResponse)
-def crear_cliente(cliente: ClienteCreate, db: Session = Depends(get_db)):
+def crear_cliente(
+    cliente: ClienteCreate,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
     cliente_existente = db.query(Cliente).filter(Cliente.telefono == cliente.telefono).first()
 
     if cliente_existente:

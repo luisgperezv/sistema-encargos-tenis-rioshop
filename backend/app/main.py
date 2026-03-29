@@ -8,6 +8,7 @@ from app.routes import cliente as cliente_router
 from app.routes import encargo as encargo_router
 
 from fastapi.staticfiles import StaticFiles
+from app.routes import auth as auth_router
 import os
 
 Base.metadata.create_all(bind=engine)
@@ -20,6 +21,7 @@ app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 
 app.include_router(cliente_router.router)
 app.include_router(encargo_router.router)
+app.include_router(auth_router.router)
 
 @app.get("/")
 def root():
