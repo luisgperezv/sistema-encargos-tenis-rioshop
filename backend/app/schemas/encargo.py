@@ -22,9 +22,18 @@ class ClienteMiniResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class ProveedorMiniResponse(BaseModel):
+    id: int
+    nombre: str
+    telefono: str
+
+    class Config:
+        from_attributes = True
+
 
 class EncargoCreate(BaseModel):
     cliente_id: int
+    proveedor_id: int | None = None
     referencia: str
     talla_col: str
     talla_eur: str | None = None
@@ -101,6 +110,7 @@ class EncargoUpdate(BaseModel):
     talla_eur: str | None = None
     foto: str
     precio: float
+    proveedor_id: int | None = None
     fecha_entrega_estimada: str | None = None
     observaciones: str | None = None
 
@@ -176,6 +186,7 @@ class EncargoAbonoUpdate(BaseModel):
 class EncargoResponse(BaseModel):
     id: int
     cliente_id: int
+    proveedor_id: int | None = None
     referencia: str
     talla_eur: str
     talla_col: str
@@ -188,6 +199,7 @@ class EncargoResponse(BaseModel):
     fecha_entrega_estimada: str | None = None
     observaciones: str | None = None
     cliente: ClienteMiniResponse
+    proveedor: ProveedorMiniResponse | None = None
 
     class Config:
         from_attributes = True

@@ -9,6 +9,7 @@ class Encargo(Base):
     id = Column(Integer, primary_key=True, index=True)
 
     cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=False)
+    proveedor_id = Column(Integer, ForeignKey("proveedores.id"), nullable=True)
 
     referencia = Column(String, nullable=False)
 
@@ -29,3 +30,4 @@ class Encargo(Base):
     observaciones = Column(String, nullable=True)
 
     cliente = relationship("Cliente", back_populates="encargos")
+    proveedor = relationship("Proveedor", back_populates="encargos")

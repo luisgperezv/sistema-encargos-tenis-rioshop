@@ -5,11 +5,14 @@ import shutil
 import os
 import uuid
 from app.core.security import get_current_user
+from app.services.whatsapp import enviar_mensaje_texto
+from app.services.utils import formatear_pesos
 
 from datetime import date
 from app.database import get_db
 from app.models.encargo import Encargo
 from app.models.cliente import Cliente
+from app.models.proveedor import Proveedor
 from app.schemas.encargo import EncargoCreate, EncargoResponse, EncargoEstadoUpdate, EncargoAbonoUpdate, EncargoUpdate
 router = APIRouter()
 
@@ -75,10 +78,18 @@ def crear_encargo(
     if not cliente:
         raise HTTPException(status_code=404, detail="El cliente no existe")
 
+    proveedor = None
+    if encargo.proveedor_id is not None:
+        proveedor = db.query(Proveedor).filter(Proveedor.id == encargo.proveedor_id).first()
+
+        if not proveedor:
+            raise HTTPException(status_code=404, detail="El proveedor no existe")
+
     saldo = validar_finanzas(encargo.precio, encargo.abono)
 
     nuevo_encargo = Encargo(
         cliente_id=encargo.cliente_id,
+        proveedor_id=encargo.proveedor_id,
         referencia=encargo.referencia,
         talla_eur=encargo.talla_eur,
         talla_col=encargo.talla_col,
@@ -93,13 +104,52 @@ def crear_encargo(
     )
 
     nuevo_encargo.cliente = cliente
+    if proveedor is not None:
+        nuevo_encargo.proveedor = proveedor
 
     db.add(nuevo_encargo)
     db.commit()
     db.refresh(nuevo_encargo)
 
+    mensaje_cliente = f"""
+Hola {cliente.nombre}, 👋
+
+Tu encargo ha sido registrado:
+
+Referencia: {nuevo_encargo.referencia}
+Talla COL: {nuevo_encargo.talla_col}
+Talla EUR: {nuevo_encargo.talla_eur}
+Precio: {formatear_pesos(nuevo_encargo.precio)}
+Abono: {formatear_pesos(nuevo_encargo.abono)}
+Saldo: {formatear_pesos(nuevo_encargo.saldo)}
+
+Fecha estimada: {nuevo_encargo.fecha_entrega_estimada}
+
+Gracias por confiar en Tenis Rio Shop 🔥
+"""
+
+    try:
+        respuesta_whatsapp = enviar_mensaje_texto(cliente.telefono, mensaje_cliente)
+        print("RESPUESTA WHATSAPP CLIENTE:", respuesta_whatsapp)
+    except Exception as e:
+        print("Error enviando mensaje al cliente:", e)
+
+    if proveedor is not None:
+        mensaje_proveedor = f"""
+Nuevo encargo recibido
+
+Referencia: {nuevo_encargo.referencia}
+Talla EUR: {nuevo_encargo.talla_eur}
+"""
+
+        try:
+            respuesta_whatsapp_proveedor = enviar_mensaje_texto(proveedor.telefono, mensaje_proveedor)
+            print("RESPUESTA WHATSAPP PROVEEDOR:", respuesta_whatsapp_proveedor)
+        except Exception as e:
+            print("Error enviando mensaje al proveedor:", e)
+
     return nuevo_encargo
-    
+
 @router.get("/encargos", response_model=list[EncargoResponse])
 def listar_encargos(
     estado: str | None = Query(default=None),
@@ -217,8 +267,16 @@ def editar_encargo(
     if encargo.estado == "entregado":
         raise HTTPException(status_code=400, detail="No se puede editar un encargo entregado")
 
+    proveedor = None
+    if data.proveedor_id is not None:
+        proveedor = db.query(Proveedor).filter(Proveedor.id == data.proveedor_id).first()
+
+        if not proveedor:
+            raise HTTPException(status_code=404, detail="El proveedor no existe")
+
     saldo = validar_finanzas(data.precio, encargo.abono)
 
+    encargo.proveedor_id = data.proveedor_id
     encargo.referencia = data.referencia
     encargo.talla_eur = data.talla_eur
     encargo.talla_col = data.talla_col
@@ -227,6 +285,9 @@ def editar_encargo(
     encargo.fecha_entrega_estimada = data.fecha_entrega_estimada
     encargo.observaciones = data.observaciones
     encargo.saldo = saldo
+
+    if proveedor is not None:
+        encargo.proveedor = proveedor
 
     db.commit()
     db.refresh(encargo)
