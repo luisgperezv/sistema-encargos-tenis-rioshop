@@ -1,17 +1,9 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import os
-from dotenv import load_dotenv
 from app.core.security import create_access_token
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-ENV_PATH = os.path.join(BASE_DIR, ".env")
-load_dotenv(ENV_PATH)
-
 router = APIRouter()
-
-ADMIN_USER = os.getenv("ADMIN_USER")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 
 
 class LoginRequest(BaseModel):
@@ -21,7 +13,16 @@ class LoginRequest(BaseModel):
 
 @router.post("/login")
 def login(data: LoginRequest):
-    if data.username != ADMIN_USER or data.password != ADMIN_PASSWORD:
+    admin_user = os.getenv("ADMIN_USER")
+    admin_password = os.getenv("ADMIN_PASSWORD")
+
+    if not admin_user or not admin_password:
+        raise HTTPException(
+            status_code=500,
+            detail="ADMIN_USER o ADMIN_PASSWORD no están configurados"
+        )
+
+    if data.username != admin_user or data.password != admin_password:
         raise HTTPException(status_code=401, detail="Credenciales incorrectas")
 
     token = create_access_token({"sub": data.username})
