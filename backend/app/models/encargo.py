@@ -16,7 +16,7 @@ class Encargo(Base):
     talla_eur = Column(String, nullable=False)
     talla_col = Column(String, nullable=False)
 
-    foto = Column(String, nullable=False)
+    foto = Column(String, nullable=True)
 
     precio = Column(Float, nullable=False)
     abono = Column(Float, default=0, nullable=False)
