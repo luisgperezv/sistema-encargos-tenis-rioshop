@@ -5,7 +5,7 @@ import shutil
 import os
 import uuid
 from app.core.security import get_current_user
-from app.services.whatsapp import enviar_mensaje_texto
+from app.services.whatsapp import enviar_template_confirmacion_encargo, enviar_mensaje_texto
 from app.services.utils import formatear_pesos
 
 from datetime import date
@@ -111,28 +111,21 @@ def crear_encargo(
     db.commit()
     db.refresh(nuevo_encargo)
 
-    mensaje_cliente = f"""
-Hola {cliente.nombre}, 👋
-
-Tu encargo ha sido registrado:
-
-Referencia: {nuevo_encargo.referencia}
-Talla COL: {nuevo_encargo.talla_col}
-Talla EUR: {nuevo_encargo.talla_eur}
-Precio: {formatear_pesos(nuevo_encargo.precio)}
-Abono: {formatear_pesos(nuevo_encargo.abono)}
-Saldo: {formatear_pesos(nuevo_encargo.saldo)}
-
-Fecha estimada: {nuevo_encargo.fecha_entrega_estimada}
-
-Gracias por confiar en Tenis Rio Shop 🔥
-"""
-
     try:
-        respuesta_whatsapp = enviar_mensaje_texto(cliente.telefono, mensaje_cliente)
+        respuesta_whatsapp = enviar_template_confirmacion_encargo(
+            numero=cliente.telefono,
+            nombre=cliente.nombre,
+            referencia=nuevo_encargo.referencia,
+            talla_col=nuevo_encargo.talla_col,
+            talla_eur=nuevo_encargo.talla_eur,
+            precio=formatear_pesos(nuevo_encargo.precio),
+            abono=formatear_pesos(nuevo_encargo.abono),
+            saldo=formatear_pesos(nuevo_encargo.saldo),
+            fecha_estimada=nuevo_encargo.fecha_entrega_estimada or ""
+        )
         print("RESPUESTA WHATSAPP CLIENTE:", respuesta_whatsapp)
     except Exception as e:
-        print("Error enviando mensaje al cliente:", e)
+        print("Error enviando template al cliente:", e)
 
     if proveedor is not None:
         mensaje_proveedor = f"""

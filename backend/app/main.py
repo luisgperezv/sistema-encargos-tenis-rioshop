@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Query
 from app.database import engine, Base
 
 from app.models import cliente
@@ -8,7 +8,6 @@ from app.models import proveedor
 from app.routes import cliente as cliente_router
 from app.routes import encargo as encargo_router
 from app.routes import proveedor as proveedor_router
-from app.models import proveedor
 
 from fastapi.staticfiles import StaticFiles
 from app.routes import auth as auth_router
@@ -30,3 +29,24 @@ app.include_router(auth_router.router)
 @app.get("/")
 def root():
     return {"mensaje": "API funcionando correctamente"}
+
+
+VERIFY_TOKEN = "tenisrio123"
+
+@app.get("/webhook")
+def verificar_webhook(
+    hub_mode: str = Query(None, alias="hub.mode"),
+    hub_challenge: str = Query(None, alias="hub.challenge"),
+    hub_verify_token: str = Query(None, alias="hub.verify_token")
+):
+    if hub_mode == "subscribe" and hub_verify_token == VERIFY_TOKEN:
+        return int(hub_challenge)
+
+    return {"error": "Token incorrecto"}
+
+
+@app.post("/webhook")
+async def recibir_webhook(request: Request):
+    data = await request.json()
+    print("WEBHOOK RECIBIDO:", data)
+    return {"status": "ok"}
