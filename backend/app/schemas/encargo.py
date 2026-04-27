@@ -1,4 +1,5 @@
 from pydantic import BaseModel, field_validator, model_validator
+from typing import Optional
 
 
 TALLAS_VALIDAS = {
@@ -37,7 +38,7 @@ class EncargoCreate(BaseModel):
     referencia: str
     talla_col: str
     talla_eur: str | None = None
-    foto: str
+    foto: Optional[str] = None
     precio: float
     abono: float = 0
     fecha_entrega_estimada: str | None = None
@@ -108,7 +109,7 @@ class EncargoUpdate(BaseModel):
     referencia: str
     talla_col: str
     talla_eur: str | None = None
-    foto: str
+    foto: Optional[str] = None
     precio: float
     proveedor_id: int | None = None
     fecha_entrega_estimada: str | None = None
@@ -190,7 +191,7 @@ class EncargoResponse(BaseModel):
     referencia: str
     talla_eur: str
     talla_col: str
-    foto: str
+    foto: Optional[str] = None
     precio: float
     abono: float
     saldo: float
