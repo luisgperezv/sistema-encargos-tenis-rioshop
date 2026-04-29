@@ -121,3 +121,38 @@ def enviar_imagen_whatsapp(numero: str, image_url: str, caption: str | None = No
 def enviar_imagen_proveedor(numero: str, image_url: str, talla_eur: str):
     caption = f"Talla EUR: {talla_eur}"
     return enviar_imagen_whatsapp(numero, image_url, caption)
+
+def enviar_template_proveedor_encargo(
+    numero: str,
+    referencia: str,
+    talla_eur: str
+):
+    url = obtener_url_whatsapp()
+    headers = obtener_headers_whatsapp()
+    numero_formateado = normalizar_numero_whatsapp(numero)
+
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": numero_formateado,
+        "type": "template",
+        "template": {
+            "name": "notificacion_proveedor_encargo",
+            "language": {
+                "code": "es"
+            },
+            "components": [
+                {
+                    "type": "body",
+                    "parameters": [
+                        {"type": "text", "text": referencia},
+                        {"type": "text", "text": talla_eur}
+                    ]
+                }
+            ]
+        }
+    }
+
+    print("PAYLOAD TEMPLATE PROVEEDOR:", payload)
+
+    response = requests.post(url, headers=headers, json=payload, timeout=30)
+    return response.json()

@@ -5,7 +5,7 @@ import shutil
 import os
 import uuid
 from app.core.security import get_current_user
-from app.services.whatsapp import enviar_template_confirmacion_encargo, enviar_mensaje_texto
+from app.services.whatsapp import enviar_template_confirmacion_encargo, enviar_template_proveedor_encargo
 from app.services.utils import formatear_pesos
 
 from datetime import date
@@ -128,18 +128,15 @@ def crear_encargo(
         print("Error enviando template al cliente:", e)
 
     if proveedor is not None:
-        mensaje_proveedor = f"""
-Nuevo encargo recibido
-
-Referencia: {nuevo_encargo.referencia}
-Talla EUR: {nuevo_encargo.talla_eur}
-"""
-
         try:
-            respuesta_whatsapp_proveedor = enviar_mensaje_texto(proveedor.telefono, mensaje_proveedor)
+            respuesta_whatsapp_proveedor = enviar_template_proveedor_encargo(
+                numero=proveedor.telefono,
+                referencia=nuevo_encargo.referencia,
+                talla_eur=nuevo_encargo.talla_eur
+            )
             print("RESPUESTA WHATSAPP PROVEEDOR:", respuesta_whatsapp_proveedor)
         except Exception as e:
-            print("Error enviando mensaje al proveedor:", e)
+            print("Error enviando template al proveedor:", e)
 
     return nuevo_encargo
 
