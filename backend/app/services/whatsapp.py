@@ -89,10 +89,7 @@ def enviar_template_confirmacion_encargo(
         }
     }
     
-    print("URL WHATSAPP TEMPLATE:", url)
-    print("PHONE NUMBER ID:", settings.WHATSAPP_PHONE_NUMBER_ID)
-    print("API VERSION:", settings.WHATSAPP_API_VERSION)
-    print("PAYLOAD TEMPLATE:", payload)
+
     response = requests.post(url, headers=headers, json=payload, timeout=30)
     return response.json()
 
@@ -152,7 +149,7 @@ def enviar_template_proveedor_encargo(
         }
     }
 
-    print("PAYLOAD TEMPLATE PROVEEDOR:", payload)
+
 
     response = requests.post(url, headers=headers, json=payload, timeout=30)
     return response.json()

@@ -123,7 +123,7 @@ def crear_encargo(
             saldo=formatear_pesos(nuevo_encargo.saldo),
             fecha_estimada=nuevo_encargo.fecha_entrega_estimada or ""
         )
-        print("RESPUESTA WHATSAPP CLIENTE:", respuesta_whatsapp)
+        print("WHATSAPP CLIENTE:", respuesta_whatsapp)
     except Exception as e:
         print("Error enviando template al cliente:", e)
 
@@ -134,7 +134,7 @@ def crear_encargo(
                 referencia=nuevo_encargo.referencia,
                 talla_eur=nuevo_encargo.talla_eur
             )
-            print("RESPUESTA WHATSAPP PROVEEDOR:", respuesta_whatsapp_proveedor)
+            print("WHATSAPP PROVEEDOR:", respuesta_whatsapp_proveedor)
         except Exception as e:
             print("Error enviando template al proveedor:", e)
 

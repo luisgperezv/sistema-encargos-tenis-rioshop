@@ -48,5 +48,5 @@ def verificar_webhook(
 @app.post("/webhook")
 async def recibir_webhook(request: Request):
     data = await request.json()
-    print("WEBHOOK RECIBIDO:", data)
+    print("WEBHOOK_STATUS:", data)
     return {"status": "ok"}
