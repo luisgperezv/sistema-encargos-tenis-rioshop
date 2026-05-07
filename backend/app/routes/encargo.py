@@ -7,8 +7,9 @@ import uuid
 from app.core.security import get_current_user
 from app.services.whatsapp import (
     enviar_template_confirmacion_encargo,
+    enviar_template_confirmacion_encargo_foto,
     enviar_template_proveedor_encargo,
-    enviar_imagen_whatsapp,
+    enviar_template_proveedor_foto,
 )
 from app.services.utils import formatear_pesos
 from app.core.config import settings
@@ -117,44 +118,67 @@ def crear_encargo(
     db.refresh(nuevo_encargo)
 
     try:
-        respuesta_whatsapp = enviar_template_confirmacion_encargo(
-            numero=cliente.telefono,
-            nombre=cliente.nombre,
-            referencia=nuevo_encargo.referencia,
-            talla_col=nuevo_encargo.talla_col,
-            talla_eur=nuevo_encargo.talla_eur,
-            precio=formatear_pesos(nuevo_encargo.precio),
-            abono=formatear_pesos(nuevo_encargo.abono),
-            saldo=formatear_pesos(nuevo_encargo.saldo),
-            fecha_estimada=nuevo_encargo.fecha_entrega_estimada or ""
-        )
+        image_url = None
+
+        if nuevo_encargo.foto and settings.PUBLIC_BACKEND_URL:
+            image_url = f"{settings.PUBLIC_BACKEND_URL}{nuevo_encargo.foto}"
+
+        if image_url:
+            respuesta_whatsapp = enviar_template_confirmacion_encargo_foto(
+                numero=cliente.telefono,
+                image_url=image_url,
+                nombre=cliente.nombre,
+                referencia=nuevo_encargo.referencia,
+                talla_col=nuevo_encargo.talla_col,
+                talla_eur=nuevo_encargo.talla_eur,
+                precio=formatear_pesos(nuevo_encargo.precio),
+                abono=formatear_pesos(nuevo_encargo.abono),
+                saldo=formatear_pesos(nuevo_encargo.saldo),
+                fecha_estimada=nuevo_encargo.fecha_entrega_estimada or ""
+            )
+        else:
+            respuesta_whatsapp = enviar_template_confirmacion_encargo(
+                numero=cliente.telefono,
+                nombre=cliente.nombre,
+                referencia=nuevo_encargo.referencia,
+                talla_col=nuevo_encargo.talla_col,
+                talla_eur=nuevo_encargo.talla_eur,
+                precio=formatear_pesos(nuevo_encargo.precio),
+                abono=formatear_pesos(nuevo_encargo.abono),
+                saldo=formatear_pesos(nuevo_encargo.saldo),
+                fecha_estimada=nuevo_encargo.fecha_entrega_estimada or ""
+            )
+
         print("WHATSAPP CLIENTE:", respuesta_whatsapp)
+
     except Exception as e:
         print("Error enviando template al cliente:", e)
 
     if proveedor is not None:
         try:
-            respuesta_whatsapp_proveedor = enviar_template_proveedor_encargo(
-                numero=proveedor.telefono,
-                referencia=nuevo_encargo.referencia,
-                talla_eur=nuevo_encargo.talla_eur
-            )
-            print("WHATSAPP PROVEEDOR:", respuesta_whatsapp_proveedor)
-        except Exception as e:
-            print("Error enviando template al proveedor:", e)
-        if nuevo_encargo.foto and settings.PUBLIC_BACKEND_URL:
-            try:
+            image_url = None
+
+            if nuevo_encargo.foto and settings.PUBLIC_BACKEND_URL:
                 image_url = f"{settings.PUBLIC_BACKEND_URL}{nuevo_encargo.foto}"
 
-                respuesta_imagen_proveedor = enviar_imagen_whatsapp(
+            if image_url:
+                respuesta_whatsapp_proveedor = enviar_template_proveedor_foto(
                     numero=proveedor.telefono,
                     image_url=image_url,
-                    caption=f"Referencia: {nuevo_encargo.referencia} | Talla EUR: {nuevo_encargo.talla_eur}"
+                    referencia=nuevo_encargo.referencia,
+                    talla_eur=nuevo_encargo.talla_eur
+                )
+            else:
+                respuesta_whatsapp_proveedor = enviar_template_proveedor_encargo(
+                    numero=proveedor.telefono,
+                    referencia=nuevo_encargo.referencia,
+                    talla_eur=nuevo_encargo.talla_eur
                 )
 
-                print("WHATSAPP IMAGEN PROVEEDOR:", respuesta_imagen_proveedor)
-            except Exception as e:
-                print("Error enviando imagen al proveedor:", e)
+            print("WHATSAPP PROVEEDOR:", respuesta_whatsapp_proveedor)
+
+        except Exception as e:
+            print("Error enviando template al proveedor:", e)
 
     return nuevo_encargo
 

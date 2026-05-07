@@ -29,24 +29,6 @@ def normalizar_numero_whatsapp(numero: str) -> str:
     return f"57{numero}"
 
 
-def enviar_mensaje_texto(numero: str, mensaje: str):
-    url = obtener_url_whatsapp()
-    headers = obtener_headers_whatsapp()
-    numero_formateado = normalizar_numero_whatsapp(numero)
-
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": numero_formateado,
-        "type": "text",
-        "text": {
-            "body": mensaje
-        }
-    }
-
-    response = requests.post(url, headers=headers, json=payload, timeout=30)
-    return response.json()
-
-
 def enviar_template_confirmacion_encargo(
     numero: str,
     nombre: str,
@@ -88,13 +70,23 @@ def enviar_template_confirmacion_encargo(
             ]
         }
     }
-    
 
     response = requests.post(url, headers=headers, json=payload, timeout=30)
     return response.json()
 
 
-def enviar_imagen_whatsapp(numero: str, image_url: str, caption: str | None = None):
+def enviar_template_confirmacion_encargo_foto(
+    numero: str,
+    image_url: str,
+    nombre: str,
+    referencia: str,
+    talla_col: str,
+    talla_eur: str,
+    precio: str,
+    abono: str,
+    saldo: str,
+    fecha_estimada: str
+):
     url = obtener_url_whatsapp()
     headers = obtener_headers_whatsapp()
     numero_formateado = normalizar_numero_whatsapp(numero)
@@ -102,22 +94,44 @@ def enviar_imagen_whatsapp(numero: str, image_url: str, caption: str | None = No
     payload = {
         "messaging_product": "whatsapp",
         "to": numero_formateado,
-        "type": "image",
-        "image": {
-            "link": image_url
+        "type": "template",
+        "template": {
+            "name": "confirmacion_encargo_foto",
+            "language": {
+                "code": "es"
+            },
+            "components": [
+                {
+                    "type": "header",
+                    "parameters": [
+                        {
+                            "type": "image",
+                            "image": {
+                                "link": image_url
+                            }
+                        }
+                    ]
+                },
+                {
+                    "type": "body",
+                    "parameters": [
+                        {"type": "text", "text": nombre},
+                        {"type": "text", "text": referencia},
+                        {"type": "text", "text": talla_col},
+                        {"type": "text", "text": talla_eur},
+                        {"type": "text", "text": precio},
+                        {"type": "text", "text": abono},
+                        {"type": "text", "text": saldo},
+                        {"type": "text", "text": fecha_estimada},
+                    ]
+                }
+            ]
         }
     }
-
-    if caption:
-        payload["image"]["caption"] = caption
 
     response = requests.post(url, headers=headers, json=payload, timeout=30)
     return response.json()
 
-
-def enviar_imagen_proveedor(numero: str, image_url: str, talla_eur: str):
-    caption = f"Talla EUR: {talla_eur}"
-    return enviar_imagen_whatsapp(numero, image_url, caption)
 
 def enviar_template_proveedor_encargo(
     numero: str,
@@ -149,7 +163,51 @@ def enviar_template_proveedor_encargo(
         }
     }
 
+    response = requests.post(url, headers=headers, json=payload, timeout=30)
+    return response.json()
 
+
+def enviar_template_proveedor_foto(
+    numero: str,
+    image_url: str,
+    referencia: str,
+    talla_eur: str
+):
+    url = obtener_url_whatsapp()
+    headers = obtener_headers_whatsapp()
+    numero_formateado = normalizar_numero_whatsapp(numero)
+
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": numero_formateado,
+        "type": "template",
+        "template": {
+            "name": "notificacion_proveedor_foto",
+            "language": {
+                "code": "es"
+            },
+            "components": [
+                {
+                    "type": "header",
+                    "parameters": [
+                        {
+                            "type": "image",
+                            "image": {
+                                "link": image_url
+                            }
+                        }
+                    ]
+                },
+                {
+                    "type": "body",
+                    "parameters": [
+                        {"type": "text", "text": referencia},
+                        {"type": "text", "text": talla_eur}
+                    ]
+                }
+            ]
+        }
+    }
 
     response = requests.post(url, headers=headers, json=payload, timeout=30)
     return response.json()
