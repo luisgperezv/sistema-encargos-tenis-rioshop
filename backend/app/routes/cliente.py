@@ -9,6 +9,35 @@ from app.schemas.cliente import ClienteCreate, ClienteResponse
 router = APIRouter()
 
 
+@router.get("/clientes", response_model=list[ClienteResponse])
+def listar_clientes(
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
+    clientes = db.query(Cliente).all()
+    return clientes
+
+
+@router.get("/clientes/buscar/{telefono}", response_model=ClienteResponse)
+def buscar_cliente_por_telefono(
+    telefono: str,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
+    telefono = telefono.strip()
+    telefono = telefono.replace(" ", "").replace("-", "").replace("(", "").replace(")", "").replace("+", "")
+
+    if telefono.startswith("57") and len(telefono) > 10:
+        telefono = telefono[2:]
+
+    cliente = db.query(Cliente).filter(Cliente.telefono == telefono).first()
+
+    if not cliente:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+
+    return cliente
+
+
 @router.post("/clientes", response_model=ClienteResponse)
 def crear_cliente(
     cliente: ClienteCreate,

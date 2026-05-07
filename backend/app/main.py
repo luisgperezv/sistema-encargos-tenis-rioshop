@@ -10,12 +10,23 @@ from app.routes import encargo as encargo_router
 from app.routes import proveedor as proveedor_router
 
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from app.routes import auth as auth_router
 import os
 
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Sistema de Encargos Tenis Rio Shop")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 UPLOADS_DIR = os.path.join(BASE_DIR, "uploads")
 

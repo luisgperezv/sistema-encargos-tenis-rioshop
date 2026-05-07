@@ -5,8 +5,13 @@ import shutil
 import os
 import uuid
 from app.core.security import get_current_user
-from app.services.whatsapp import enviar_template_confirmacion_encargo, enviar_template_proveedor_encargo
+from app.services.whatsapp import (
+    enviar_template_confirmacion_encargo,
+    enviar_template_proveedor_encargo,
+    enviar_imagen_whatsapp,
+)
 from app.services.utils import formatear_pesos
+from app.core.config import settings
 
 from datetime import date
 from app.database import get_db
@@ -137,6 +142,19 @@ def crear_encargo(
             print("WHATSAPP PROVEEDOR:", respuesta_whatsapp_proveedor)
         except Exception as e:
             print("Error enviando template al proveedor:", e)
+        if nuevo_encargo.foto and settings.PUBLIC_BACKEND_URL:
+            try:
+                image_url = f"{settings.PUBLIC_BACKEND_URL}{nuevo_encargo.foto}"
+
+                respuesta_imagen_proveedor = enviar_imagen_whatsapp(
+                    numero=proveedor.telefono,
+                    image_url=image_url,
+                    caption=f"Referencia: {nuevo_encargo.referencia} | Talla EUR: {nuevo_encargo.talla_eur}"
+                )
+
+                print("WHATSAPP IMAGEN PROVEEDOR:", respuesta_imagen_proveedor)
+            except Exception as e:
+                print("Error enviando imagen al proveedor:", e)
 
     return nuevo_encargo
 
