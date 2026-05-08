@@ -4,7 +4,7 @@ from app.core.security import get_current_user
 
 from app.database import get_db
 from app.models.cliente import Cliente
-from app.schemas.cliente import ClienteCreate, ClienteResponse
+from app.schemas.cliente import ClienteCreate, ClienteResponse, ClienteUpdate
 
 router = APIRouter()
 
@@ -59,3 +59,38 @@ def crear_cliente(
     db.refresh(nuevo_cliente)
 
     return nuevo_cliente
+
+@router.put("/clientes/{cliente_id}", response_model=ClienteResponse)
+def editar_cliente(
+    cliente_id: int,
+    data: ClienteUpdate,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
+    cliente = db.query(Cliente).filter(Cliente.id == cliente_id).first()
+
+    if not cliente:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+
+    cliente_con_mismo_telefono = (
+        db.query(Cliente)
+        .filter(
+            Cliente.telefono == data.telefono,
+            Cliente.id != cliente_id
+        )
+        .first()
+    )
+
+    if cliente_con_mismo_telefono:
+        raise HTTPException(
+            status_code=400,
+            detail="Ya existe otro cliente con ese teléfono"
+        )
+
+    cliente.nombre = data.nombre
+    cliente.telefono = data.telefono
+
+    db.commit()
+    db.refresh(cliente)
+
+    return cliente
