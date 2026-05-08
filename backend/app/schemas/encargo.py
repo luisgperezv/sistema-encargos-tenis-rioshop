@@ -179,6 +179,23 @@ class EncargoUpdate(BaseModel):
 class EncargoEstadoUpdate(BaseModel):
     estado: str
 
+    @field_validator("estado")
+    @classmethod
+    def validar_estado(cls, value: str):
+        estados_validos = [
+            "pendiente",
+            "pedido",
+            "despachado",
+            "en_local",
+            "entregado",
+            "cancelado",
+        ]
+
+        if value not in estados_validos:
+            raise ValueError("Estado no válido")
+
+        return value
+
 
 class EncargoAbonoUpdate(BaseModel):
     abono: float

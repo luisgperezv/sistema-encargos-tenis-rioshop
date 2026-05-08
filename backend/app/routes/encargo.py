@@ -8,6 +8,7 @@ from app.core.security import get_current_user
 from app.services.whatsapp import (
     enviar_template_confirmacion_encargo,
     enviar_template_confirmacion_encargo_foto,
+    enviar_template_encargo_en_local,
     enviar_template_proveedor_encargo,
     enviar_template_proveedor_foto,
 )
@@ -233,7 +234,12 @@ def eliminar_encargo(encargo_id: int, db: Session = Depends(get_db), current_use
     return {"mensaje": "Encargo eliminado correctamente"}
 
 @router.put("/encargos/{encargo_id}/estado", response_model=EncargoResponse)
-def actualizar_estado(encargo_id: int, data: EncargoEstadoUpdate, db: Session = Depends(get_db), current_user: str = Depends(get_current_user)):
+def actualizar_estado(
+    encargo_id: int,
+    data: EncargoEstadoUpdate,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
     encargo = db.query(Encargo).filter(Encargo.id == encargo_id).first()
 
     if not encargo:
@@ -251,10 +257,26 @@ def actualizar_estado(encargo_id: int, data: EncargoEstadoUpdate, db: Session = 
             detail="No se puede entregar un encargo con saldo pendiente"
         )
 
+    estado_anterior = encargo.estado
     encargo.estado = data.estado
 
     db.commit()
     db.refresh(encargo)
+
+    if data.estado == "en_local" and estado_anterior != "en_local":
+        if encargo.cliente and encargo.foto and settings.PUBLIC_BACKEND_URL:
+            try:
+                image_url = f"{settings.PUBLIC_BACKEND_URL}{encargo.foto}"
+
+                enviar_template_encargo_en_local(
+                    numero=encargo.cliente.telefono,
+                    image_url=image_url,
+                    nombre=encargo.cliente.nombre,
+                    referencia=encargo.referencia,
+                    saldo=formatear_pesos(encargo.saldo)
+                )
+            except Exception as e:
+                print("Error enviando WhatsApp en local:", e)
 
     return encargo
 

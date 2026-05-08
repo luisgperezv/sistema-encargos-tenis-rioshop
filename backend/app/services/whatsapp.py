@@ -211,3 +211,53 @@ def enviar_template_proveedor_foto(
 
     response = requests.post(url, headers=headers, json=payload, timeout=30)
     return response.json()
+
+def enviar_template_encargo_en_local(
+    numero: str,
+    image_url: str,
+    nombre: str,
+    referencia: str,
+    saldo: str
+):
+    url = obtener_url_whatsapp()
+    headers = obtener_headers_whatsapp()
+    numero_formateado = normalizar_numero_whatsapp(numero)
+
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": numero_formateado,
+        "type": "template",
+        "template": {
+            "name": "encargo_en_local_foto",
+            "language": {
+                "code": "es"
+            },
+            "components": [
+                {
+                    "type": "header",
+                    "parameters": [
+                        {
+                            "type": "image",
+                            "image": {
+                                "link": image_url
+                            }
+                        }
+                    ]
+                },
+                {
+                    "type": "body",
+                    "parameters": [
+                        {"type": "text", "text": nombre},
+                        {"type": "text", "text": referencia},
+                        {"type": "text", "text": saldo},
+                    ]
+                }
+            ]
+        }
+    }
+
+    response = requests.post(url, headers=headers, json=payload, timeout=30)
+
+    print("WHATSAPP EN LOCAL:", response.json())
+
+    return response.json()
