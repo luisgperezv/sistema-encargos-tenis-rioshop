@@ -6,7 +6,8 @@ import {
   listarClientesRequest,
   subirImagenRequest,
   listarProveedoresRequest,
-  editarProveedorRequest,    
+  editarProveedorRequest,
+  crearProveedorRequest,
 } from "../services/api";
 
 type Cliente = {
@@ -115,6 +116,10 @@ useEffect(() => {
   const crearEncargo = async () => {
     try {
       setCargando(true);
+      if (!proveedorSeleccionado) {
+        setMensaje("❌ Debes seleccionar o crear un proveedor");
+        return;
+      }
 
       let cliente = clienteSeleccionado;
 
@@ -153,7 +158,7 @@ useEffect(() => {
 
       const data = {
         cliente_id: cliente!.id,
-        proveedor_id: Number(proveedorId),
+        proveedor_id: proveedorSeleccionado.id,
         referencia,
         talla_col: tallaCol,
         talla_eur: tallaEur,
@@ -293,6 +298,43 @@ useEffect(() => {
   value={telefonoProveedor}
   onChange={(e) => setTelefonoProveedor(e.target.value)}
 />
+
+<br />
+
+<button
+  disabled={cargando}
+  onClick={async () => {
+    try {
+      setCargando(true);
+
+      const respuesta = await crearProveedorRequest({
+        nombre: nombreProveedor,
+        telefono: telefonoProveedor,
+      });
+
+      if (respuesta.id) {
+        setMensaje("✅ Proveedor creado correctamente");
+
+        await cargarProveedores();
+
+        setProveedorSeleccionado(respuesta);
+        setProveedorId(String(respuesta.id));
+
+      } else if (respuesta.detail) {
+        setMensaje(`❌ ${respuesta.detail}`);
+      } else {
+        setMensaje("❌ Error al crear proveedor");
+      }
+    } catch (error) {
+      console.error(error);
+      setMensaje("❌ Error de conexión");
+    } finally {
+      setCargando(false);
+    }
+  }}
+>
+  Crear proveedor
+</button>
 
 {proveedorSeleccionado && (
   <>
