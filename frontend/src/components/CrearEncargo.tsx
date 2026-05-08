@@ -34,7 +34,7 @@ function CrearEncargo() {
   const [nombreProveedor, setNombreProveedor] = useState("");
   const [telefonoProveedor, setTelefonoProveedor] = useState("");
 
-  const [proveedorId, setProveedorId] = useState("1");
+ 
   const [referencia, setReferencia] = useState("");
   const [tallaCol, setTallaCol] = useState("");
   const [tallaEur, setTallaEur] = useState("");
@@ -116,6 +116,40 @@ useEffect(() => {
   const crearEncargo = async () => {
     try {
       setCargando(true);
+    if (!nombreCliente.trim()) {
+      setMensaje("❌ Debes escribir el nombre del cliente");
+      return;
+    }
+
+    if (!telefonoCliente.trim()) {
+      setMensaje("❌ Debes escribir el teléfono del cliente");
+      return;
+    }
+
+    if (!proveedorSeleccionado) {
+      setMensaje("❌ Debes seleccionar o crear un proveedor");
+      return;
+    }
+
+    if (!referencia.trim()) {
+      setMensaje("❌ Debes escribir una referencia");
+      return;
+    }
+
+    if (!tallaCol.trim()) {
+      setMensaje("❌ Debes escribir talla COL");
+      return;
+    }
+
+    if (!tallaEur.trim()) {
+      setMensaje("❌ Debes escribir talla EUR");
+      return;
+    }
+
+    if (!precio || Number(precio) <= 0) {
+      setMensaje("❌ El precio debe ser mayor a 0");
+      return;
+    }
       if (!proveedorSeleccionado) {
         setMensaje("❌ Debes seleccionar o crear un proveedor");
         return;
@@ -184,6 +218,13 @@ useEffect(() => {
         setFechaEntrega("");
         setObservaciones("");
         setFoto(null);
+        setNombreCliente("");
+        setTelefonoCliente("");
+        setClienteSeleccionado(null);
+
+        setNombreProveedor("");
+        setTelefonoProveedor("");
+        setProveedorSeleccionado(null);
       } else if (respuesta.detail) {
         if (Array.isArray(respuesta.detail)) {
           setMensaje(`❌ ${respuesta.detail[0].msg}`);
@@ -268,7 +309,7 @@ useEffect(() => {
 
     if (proveedor) {
       setProveedorSeleccionado(proveedor);
-      setProveedorId(String(proveedor.id));
+      
       setNombreProveedor(proveedor.nombre);
       setTelefonoProveedor(proveedor.telefono);
     }
@@ -318,7 +359,7 @@ useEffect(() => {
         await cargarProveedores();
 
         setProveedorSeleccionado(respuesta);
-        setProveedorId(String(respuesta.id));
+        
 
       } else if (respuesta.detail) {
         setMensaje(`❌ ${respuesta.detail}`);
