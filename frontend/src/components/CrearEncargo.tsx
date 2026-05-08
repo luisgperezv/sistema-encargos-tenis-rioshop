@@ -6,8 +6,7 @@ import {
   listarClientesRequest,
   subirImagenRequest,
   listarProveedoresRequest,
-  editarProveedorRequest,
-  crearProveedorRequest,  
+  editarProveedorRequest,    
 } from "../services/api";
 
 type Cliente = {

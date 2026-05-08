@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { loginRequest } from "./services/api";
 import CrearEncargo from "./components/CrearEncargo";
+import ListarEncargos from "./components/ListarEncargos";
 
 function App() {
   const [username, setUsername] = useState("");
@@ -25,8 +26,13 @@ function App() {
   };
 
   if (logueado) {
-    return <CrearEncargo />;
-  }
+  return (
+    <>
+      <CrearEncargo />
+      <ListarEncargos />
+    </>
+  );
+}
 
   return (
     <div style={{ padding: "20px" }}>

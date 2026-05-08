@@ -146,3 +146,63 @@ export const editarProveedorRequest = async (
 
   return res.json();
 };
+
+export const listarEncargosRequest = async (
+  buscar?: string,
+  estado?: string
+) => {
+  const token = localStorage.getItem("token");
+
+  const params = new URLSearchParams();
+
+  if (buscar) params.append("buscar", buscar);
+  if (estado) params.append("estado", estado);
+
+  const res = await fetch(`${API_URL}/encargos?${params.toString()}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return res.json();
+};
+
+export const actualizarEstadoEncargoRequest = async (
+  encargoId: number,
+  estado: string
+) => {
+  const token = localStorage.getItem("token");
+
+  const res = await fetch(
+    `${API_URL}/encargos/${encargoId}/estado`,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ estado }),
+    }
+  );
+
+  return res.json();
+};
+
+export const agregarAbonoEncargoRequest = async (
+  encargoId: number,
+  abono: number
+) => {
+  const token = localStorage.getItem("token");
+
+  const res = await fetch(`${API_URL}/encargos/${encargoId}/abono`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ abono }),
+  });
+
+  return res.json();
+};
