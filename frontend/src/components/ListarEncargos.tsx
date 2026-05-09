@@ -243,6 +243,20 @@ function ListarEncargos() {
             >
               Editar encargo
             </button>
+            <button
+              className="btn btn-secondary"
+              onClick={() => {
+                const confirmar = window.confirm(
+                  "¿Seguro que deseas cancelar este encargo?",
+                );
+
+                if (confirmar) {
+                  cambiarEstado(encargo.id, "cancelado");
+                }
+              }}
+            >
+              Cancelar
+            </button>
           </div>
 
           {encargoEditando?.id === encargo.id && (
