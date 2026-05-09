@@ -19,7 +19,11 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(title="Sistema de Encargos Tenis Rio Shop")
 app.add_middleware(
     CORSMiddleware,
-    "http://127.0.0.1:5173",
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "https://merry-appreciation-production-135b.up.railway.app",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
