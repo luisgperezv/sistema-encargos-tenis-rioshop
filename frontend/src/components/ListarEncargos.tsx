@@ -7,6 +7,8 @@ import {
   listarProveedoresRequest,
 } from "../services/api";
 
+import "./ListarEncargos.css";
+
 const colorEstado = (estado: string) => {
   if (estado === "pendiente") return "#ffd6d6";
   if (estado === "despachado") return "#fff3bf";
@@ -99,7 +101,6 @@ function ListarEncargos() {
 
   const abrirEdicion = (encargo: any) => {
     setEncargoEditando(encargo);
-
     setEditReferencia(encargo.referencia);
     setEditTallaCol(encargo.talla_col);
     setEditTallaEur(encargo.talla_eur);
@@ -110,6 +111,7 @@ function ListarEncargos() {
       encargo.proveedor_id ? String(encargo.proveedor_id) : "",
     );
   };
+
   const guardarEdicion = async () => {
     if (!encargoEditando) return;
 
@@ -155,215 +157,211 @@ function ListarEncargos() {
   }, []);
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h1>Listado de Encargos</h1>
+    <div className="encargos-container">
+      <h1 className="encargos-title">Listado de Encargos</h1>
 
-      <input
-        placeholder="Buscar por cliente, referencia o ID"
-        value={buscar}
-        onChange={(e) => setBuscar(e.target.value)}
-      />
+      <div className="filtros">
+        <input
+          placeholder="Buscar por cliente, referencia o ID"
+          value={buscar}
+          onChange={(e) => setBuscar(e.target.value)}
+        />
 
-      <select
-        value={estadoFiltro}
-        onChange={(e) => setEstadoFiltro(e.target.value)}
-      >
-        <option value="">Todos los estados</option>
-        <option value="pendiente">Pendiente</option>
-        <option value="pedido">Pedido</option>
-        <option value="despachado">Despachado</option>
-        <option value="en_local">En local</option>
-        <option value="entregado">Entregado</option>
-        <option value="cancelado">Cancelado</option>
-      </select>
-
-      <button onClick={cargarEncargos}>Buscar</button>
-
-      <br />
-      <br />
-
-      {mensaje && <p>{mensaje}</p>}
-      {encargoEditando && (
-        <div
-          style={{
-            border: "2px solid #000",
-            padding: "15px",
-            marginBottom: "20px",
-          }}
+        <select
+          value={estadoFiltro}
+          onChange={(e) => setEstadoFiltro(e.target.value)}
         >
-          <h2>Editando encargo #{encargoEditando.id}</h2>
+          <option value="">Todos los estados</option>
+          <option value="pendiente">Pendiente</option>
+          <option value="pedido">Pedido</option>
+          <option value="despachado">Despachado</option>
+          <option value="en_local">En local</option>
+          <option value="entregado">Entregado</option>
+          <option value="cancelado">Cancelado</option>
+        </select>
 
-          <label>Proveedor</label>
-          <br />
-          <select
-            value={editProveedorId}
-            onChange={(e) => setEditProveedorId(e.target.value)}
-          >
-            <option value="">Sin proveedor</option>
-            {proveedores.map((proveedor) => (
-              <option key={proveedor.id} value={proveedor.id}>
-                {proveedor.nombre} - {proveedor.telefono}
-              </option>
-            ))}
-          </select>
+        <button className="btn btn-primary" onClick={cargarEncargos}>
+          Buscar
+        </button>
+      </div>
 
-          <br />
-          <br />
+      {mensaje && <p className="mensaje">{mensaje}</p>}
 
-          <label>Referencia</label>
-          <br />
-          <input
-            value={editReferencia}
-            onChange={(e) => setEditReferencia(e.target.value)}
-          />
-
-          <br />
-          <br />
-
-          <label>Talla COL</label>
-          <br />
-          <input
-            value={editTallaCol}
-            onChange={(e) => setEditTallaCol(e.target.value)}
-          />
-
-          <br />
-          <br />
-
-          <label>Talla EUR</label>
-          <br />
-          <input
-            value={editTallaEur}
-            onChange={(e) => setEditTallaEur(e.target.value)}
-          />
-
-          <br />
-          <br />
-
-          <label>Precio</label>
-          <br />
-          <input
-            value={editPrecio}
-            onChange={(e) => setEditPrecio(e.target.value)}
-          />
-
-          <br />
-          <br />
-
-          <label>Fecha estimada</label>
-          <br />
-          <input
-            type="date"
-            value={editFechaEntrega}
-            onChange={(e) => setEditFechaEntrega(e.target.value)}
-          />
-
-          <br />
-          <br />
-
-          <label>Observaciones</label>
-          <br />
-          <textarea
-            value={editObservaciones}
-            onChange={(e) => setEditObservaciones(e.target.value)}
-          />
-
-          <br />
-          <br />
-
-          <button onClick={guardarEdicion}>
-            Guardar cambios
-          </button>
-
-          <button onClick={() => setEncargoEditando(null)}>Cancelar</button>
-        </div>
-      )}
       {encargos.map((encargo) => (
         <div
           key={encargo.id}
+          className="card-encargo"
           style={{
-            border: "1px solid #ccc",
-            padding: "10px",
-            marginBottom: "10px",
             backgroundColor: colorEstado(encargo.estado),
-            borderRadius: "8px",
           }}
         >
-          <h3>
-            #{encargo.id} - {encargo.referencia}
-          </h3>
+          <div className="card-header">
+            <h3>
+              #{encargo.id} - {encargo.referencia}
+            </h3>
 
-          <p>
-            <strong>Cliente:</strong> {encargo.cliente?.nombre}
-          </p>
-          <p>
-            <strong>Proveedor:</strong> {encargo.proveedor?.nombre}
-          </p>
-          <p>
-            <strong>Talla:</strong> COL {encargo.talla_col} / EUR{" "}
-            {encargo.talla_eur}
-          </p>
-          <p>
-            <strong>Precio:</strong> {formatearPesos(encargo.precio)}
-          </p>
-          <p>
-            <strong>Abono:</strong> {formatearPesos(encargo.abono)}
-          </p>
-          <p>
-            <strong>Saldo:</strong> {formatearPesos(encargo.saldo)}
-          </p>
-          <p>
-            <strong>Estado:</strong> {encargo.estado}
-          </p>
+            <button
+              className="btn btn-primary"
+              onClick={() => abrirEdicion(encargo)}
+            >
+              Editar encargo
+            </button>
+          </div>
 
-          <button onClick={() => abrirEdicion(encargo)}>Editar encargo</button>
+          {encargoEditando?.id === encargo.id && (
+            <div className="editor">
+              <h2>Editando encargo #{encargoEditando.id}</h2>
 
-          <br />
-          <br />
+              <div className="editor-grid">
+                <div>
+                  <label>Proveedor</label>
+                  <select
+                    value={editProveedorId}
+                    onChange={(e) => setEditProveedorId(e.target.value)}
+                  >
+                    <option value="">Sin proveedor</option>
+                    {proveedores.map((proveedor) => (
+                      <option key={proveedor.id} value={proveedor.id}>
+                        {proveedor.nombre} - {proveedor.telefono}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-          {encargo.saldo > 0 && (
-            <>
-              <input
-                placeholder="Nuevo abono"
-                value={abonos[encargo.id] || ""}
-                onChange={(e) =>
-                  setAbonos((prev) => ({
-                    ...prev,
-                    [encargo.id]: e.target.value,
-                  }))
-                }
-              />
+                <div>
+                  <label>Referencia</label>
+                  <input
+                    value={editReferencia}
+                    onChange={(e) => setEditReferencia(e.target.value)}
+                  />
+                </div>
 
-              <button onClick={() => agregarAbono(encargo.id)}>
-                Agregar abono
-              </button>
-            </>
+                <div>
+                  <label>Talla COL</label>
+                  <input
+                    value={editTallaCol}
+                    onChange={(e) => setEditTallaCol(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label>Talla EUR</label>
+                  <input
+                    value={editTallaEur}
+                    onChange={(e) => setEditTallaEur(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label>Precio</label>
+                  <input
+                    value={editPrecio}
+                    onChange={(e) => setEditPrecio(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label>Fecha estimada</label>
+                  <input
+                    type="date"
+                    value={editFechaEntrega}
+                    onChange={(e) => setEditFechaEntrega(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label>Observaciones</label>
+                  <textarea
+                    value={editObservaciones}
+                    onChange={(e) => setEditObservaciones(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="acciones">
+                <button className="btn btn-primary" onClick={guardarEdicion}>
+                  Guardar cambios
+                </button>
+
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setEncargoEditando(null)}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
           )}
 
-          <br />
-          <br />
+          <div className="info-grid">
+            <p>
+              <strong>Cliente:</strong> {encargo.cliente?.nombre}
+            </p>
+            <p>
+              <strong>Proveedor:</strong> {encargo.proveedor?.nombre}
+            </p>
+            <p>
+              <strong>Talla:</strong> COL {encargo.talla_col} / EUR{" "}
+              {encargo.talla_eur}
+            </p>
+            <p>
+              <strong>Precio:</strong> {formatearPesos(encargo.precio)}
+            </p>
+            <p>
+              <strong>Abono:</strong> {formatearPesos(encargo.abono)}
+            </p>
+            <p>
+              <strong>Saldo:</strong> {formatearPesos(encargo.saldo)}
+            </p>
+            <p>
+              <strong>Estado:</strong> {encargo.estado}
+            </p>
+            <p>
+              <strong>Fecha:</strong> {encargo.fecha_creacion}
+            </p>
+          </div>
 
-          <select
-            value={encargo.estado}
-            onChange={(e) => cambiarEstado(encargo.id, e.target.value)}
-          >
-            <option value="pendiente">Pendiente</option>
-            <option value="pedido">Pedido</option>
-            <option value="despachado">Despachado</option>
-            <option value="en_local">En local</option>
-            <option value="entregado">Entregado</option>
-            <option value="cancelado">Cancelado</option>
-          </select>
+          <div className="acciones">
+            {encargo.saldo > 0 && (
+              <>
+                <input
+                  placeholder="Nuevo abono"
+                  value={abonos[encargo.id] || ""}
+                  onChange={(e) =>
+                    setAbonos((prev) => ({
+                      ...prev,
+                      [encargo.id]: e.target.value,
+                    }))
+                  }
+                />
 
-          <p>
-            <strong>Fecha:</strong> {encargo.fecha_creacion}
-          </p>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => agregarAbono(encargo.id)}
+                >
+                  Agregar abono
+                </button>
+              </>
+            )}
+
+            <select
+              value={encargo.estado}
+              onChange={(e) => cambiarEstado(encargo.id, e.target.value)}
+            >
+              <option value="pendiente">Pendiente</option>
+              <option value="pedido">Pedido</option>
+              <option value="despachado">Despachado</option>
+              <option value="en_local">En local</option>
+              <option value="entregado">Entregado</option>
+              <option value="cancelado">Cancelado</option>
+            </select>
+          </div>
 
           {encargo.foto && (
             <img
               src={`${import.meta.env.VITE_API_URL}${encargo.foto}`}
               alt={encargo.referencia}
-              style={{ width: "120px", borderRadius: "8px" }}
+              className="imagen-encargo"
             />
           )}
         </div>
