@@ -114,6 +114,25 @@ function ListarEncargos() {
 
   const guardarEdicion = async () => {
     if (!encargoEditando) return;
+    if (!editReferencia.trim()) {
+      setMensaje("❌ La referencia es obligatoria");
+      return;
+    }
+
+    if (!editTallaCol.trim()) {
+      setMensaje("❌ La talla COL es obligatoria");
+      return;
+    }
+
+    if (!editTallaEur.trim()) {
+      setMensaje("❌ La talla EUR es obligatoria");
+      return;
+    }
+
+    if (!editPrecio || Number(editPrecio) <= 0) {
+      setMensaje("❌ El precio debe ser mayor a 0");
+      return;
+    }
 
     const respuesta = await editarEncargoRequest(encargoEditando.id, {
       proveedor_id: editProveedorId ? Number(editProveedorId) : null,
