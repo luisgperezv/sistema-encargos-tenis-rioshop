@@ -206,3 +206,30 @@ export const agregarAbonoEncargoRequest = async (
 
   return res.json();
 };
+
+export const editarEncargoRequest = async (
+  encargoId: number,
+  data: {
+    proveedor_id: number | null;
+    referencia: string;
+    talla_col: string;
+    talla_eur: string;
+    foto: string | null;
+    precio: number;
+    fecha_entrega_estimada: string | null;
+    observaciones: string | null;
+  }
+) => {
+  const token = localStorage.getItem("token");
+
+  const res = await fetch(`${API_URL}/encargos/${encargoId}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+
+  return res.json();
+};

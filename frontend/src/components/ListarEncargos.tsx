@@ -3,6 +3,8 @@ import {
   listarEncargosRequest,
   actualizarEstadoEncargoRequest,
   agregarAbonoEncargoRequest,
+  editarEncargoRequest,
+  listarProveedoresRequest,
 } from "../services/api";
 
 const colorEstado = (estado: string) => {
@@ -31,6 +33,17 @@ function ListarEncargos() {
   const [buscar, setBuscar] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState("");
 
+  const [encargoEditando, setEncargoEditando] = useState<any | null>(null);
+  const [proveedores, setProveedores] = useState<any[]>([]);
+
+  const [editReferencia, setEditReferencia] = useState("");
+  const [editTallaCol, setEditTallaCol] = useState("");
+  const [editTallaEur, setEditTallaEur] = useState("");
+  const [editPrecio, setEditPrecio] = useState("");
+  const [editFechaEntrega, setEditFechaEntrega] = useState("");
+  const [editObservaciones, setEditObservaciones] = useState("");
+  const [editProveedorId, setEditProveedorId] = useState("");
+
   const cargarEncargos = async () => {
     const data = await listarEncargosRequest(buscar, estadoFiltro);
 
@@ -42,13 +55,14 @@ function ListarEncargos() {
   };
 
   const cambiarEstado = async (encargoId: number, nuevoEstado: string) => {
-    const respuesta = await actualizarEstadoEncargoRequest(encargoId, nuevoEstado);
+    const respuesta = await actualizarEstadoEncargoRequest(
+      encargoId,
+      nuevoEstado,
+    );
 
     if (respuesta.id) {
       setEncargos((prev) =>
-        prev.map((encargo) =>
-          encargo.id === encargoId ? respuesta : encargo
-        )
+        prev.map((encargo) => (encargo.id === encargoId ? respuesta : encargo)),
       );
     } else if (respuesta.detail) {
       alert(respuesta.detail);
@@ -69,9 +83,7 @@ function ListarEncargos() {
 
     if (respuesta.id) {
       setEncargos((prev) =>
-        prev.map((encargo) =>
-          encargo.id === encargoId ? respuesta : encargo
-        )
+        prev.map((encargo) => (encargo.id === encargoId ? respuesta : encargo)),
       );
 
       setAbonos((prev) => ({
@@ -85,40 +97,187 @@ function ListarEncargos() {
     }
   };
 
+  const abrirEdicion = (encargo: any) => {
+    setEncargoEditando(encargo);
+
+    setEditReferencia(encargo.referencia);
+    setEditTallaCol(encargo.talla_col);
+    setEditTallaEur(encargo.talla_eur);
+    setEditPrecio(String(encargo.precio));
+    setEditFechaEntrega(encargo.fecha_entrega_estimada || "");
+    setEditObservaciones(encargo.observaciones || "");
+    setEditProveedorId(
+      encargo.proveedor_id ? String(encargo.proveedor_id) : "",
+    );
+  };
+  const guardarEdicion = async () => {
+    if (!encargoEditando) return;
+
+    const respuesta = await editarEncargoRequest(encargoEditando.id, {
+      proveedor_id: editProveedorId ? Number(editProveedorId) : null,
+      referencia: editReferencia,
+      talla_col: editTallaCol,
+      talla_eur: editTallaEur,
+      foto: encargoEditando.foto || null,
+      precio: Number(editPrecio),
+      fecha_entrega_estimada: editFechaEntrega || null,
+      observaciones: editObservaciones || null,
+    });
+
+    if (respuesta.id) {
+      setEncargos((prev) =>
+        prev.map((encargo) =>
+          encargo.id === respuesta.id ? respuesta : encargo,
+        ),
+      );
+
+      setEncargoEditando(null);
+      setMensaje("✅ Encargo actualizado correctamente");
+    } else if (respuesta.detail) {
+      setMensaje(`❌ ${respuesta.detail}`);
+    } else {
+      setMensaje("❌ Error al actualizar encargo");
+    }
+  };
+
   useEffect(() => {
     cargarEncargos();
+
+    const cargarProveedores = async () => {
+      const data = await listarProveedoresRequest();
+
+      if (Array.isArray(data)) {
+        setProveedores(data);
+      }
+    };
+
+    cargarProveedores();
   }, []);
 
   return (
     <div style={{ padding: "20px" }}>
       <h1>Listado de Encargos</h1>
+
       <input
-  placeholder="Buscar por cliente, referencia o ID"
-  value={buscar}
-  onChange={(e) => setBuscar(e.target.value)}
-/>
+        placeholder="Buscar por cliente, referencia o ID"
+        value={buscar}
+        onChange={(e) => setBuscar(e.target.value)}
+      />
 
-<select
-  value={estadoFiltro}
-  onChange={(e) => setEstadoFiltro(e.target.value)}
->
-  <option value="">Todos los estados</option>
-  <option value="pendiente">Pendiente</option>
-  <option value="pedido">Pedido</option>
-  <option value="despachado">Despachado</option>
-  <option value="en_local">En local</option>
-  <option value="entregado">Entregado</option>
-  <option value="cancelado">Cancelado</option>
-</select>
+      <select
+        value={estadoFiltro}
+        onChange={(e) => setEstadoFiltro(e.target.value)}
+      >
+        <option value="">Todos los estados</option>
+        <option value="pendiente">Pendiente</option>
+        <option value="pedido">Pedido</option>
+        <option value="despachado">Despachado</option>
+        <option value="en_local">En local</option>
+        <option value="entregado">Entregado</option>
+        <option value="cancelado">Cancelado</option>
+      </select>
 
-<button onClick={cargarEncargos}>
-  Buscar
-</button>
+      <button onClick={cargarEncargos}>Buscar</button>
 
-<br /><br />
+      <br />
+      <br />
 
       {mensaje && <p>{mensaje}</p>}
+      {encargoEditando && (
+        <div
+          style={{
+            border: "2px solid #000",
+            padding: "15px",
+            marginBottom: "20px",
+          }}
+        >
+          <h2>Editando encargo #{encargoEditando.id}</h2>
 
+          <label>Proveedor</label>
+          <br />
+          <select
+            value={editProveedorId}
+            onChange={(e) => setEditProveedorId(e.target.value)}
+          >
+            <option value="">Sin proveedor</option>
+            {proveedores.map((proveedor) => (
+              <option key={proveedor.id} value={proveedor.id}>
+                {proveedor.nombre} - {proveedor.telefono}
+              </option>
+            ))}
+          </select>
+
+          <br />
+          <br />
+
+          <label>Referencia</label>
+          <br />
+          <input
+            value={editReferencia}
+            onChange={(e) => setEditReferencia(e.target.value)}
+          />
+
+          <br />
+          <br />
+
+          <label>Talla COL</label>
+          <br />
+          <input
+            value={editTallaCol}
+            onChange={(e) => setEditTallaCol(e.target.value)}
+          />
+
+          <br />
+          <br />
+
+          <label>Talla EUR</label>
+          <br />
+          <input
+            value={editTallaEur}
+            onChange={(e) => setEditTallaEur(e.target.value)}
+          />
+
+          <br />
+          <br />
+
+          <label>Precio</label>
+          <br />
+          <input
+            value={editPrecio}
+            onChange={(e) => setEditPrecio(e.target.value)}
+          />
+
+          <br />
+          <br />
+
+          <label>Fecha estimada</label>
+          <br />
+          <input
+            type="date"
+            value={editFechaEntrega}
+            onChange={(e) => setEditFechaEntrega(e.target.value)}
+          />
+
+          <br />
+          <br />
+
+          <label>Observaciones</label>
+          <br />
+          <textarea
+            value={editObservaciones}
+            onChange={(e) => setEditObservaciones(e.target.value)}
+          />
+
+          <br />
+          <br />
+
+          <button onClick={guardarEdicion}>
+            Guardar cambios
+          </button>
+
+          <button onClick={() => setEncargoEditando(null)}>Cancelar</button>
+        </div>
+      )}
       {encargos.map((encargo) => (
         <div
           key={encargo.id}
@@ -130,15 +289,37 @@ function ListarEncargos() {
             borderRadius: "8px",
           }}
         >
-          <h3>#{encargo.id} - {encargo.referencia}</h3>
+          <h3>
+            #{encargo.id} - {encargo.referencia}
+          </h3>
 
-          <p><strong>Cliente:</strong> {encargo.cliente?.nombre}</p>
-          <p><strong>Proveedor:</strong> {encargo.proveedor?.nombre}</p>
-          <p><strong>Talla:</strong> COL {encargo.talla_col} / EUR {encargo.talla_eur}</p>
-          <p><strong>Precio:</strong> {formatearPesos(encargo.precio)}</p>
-          <p><strong>Abono:</strong> {formatearPesos(encargo.abono)}</p>
-          <p><strong>Saldo:</strong> {formatearPesos(encargo.saldo)}</p>
-          <p><strong>Estado:</strong> {encargo.estado}</p>
+          <p>
+            <strong>Cliente:</strong> {encargo.cliente?.nombre}
+          </p>
+          <p>
+            <strong>Proveedor:</strong> {encargo.proveedor?.nombre}
+          </p>
+          <p>
+            <strong>Talla:</strong> COL {encargo.talla_col} / EUR{" "}
+            {encargo.talla_eur}
+          </p>
+          <p>
+            <strong>Precio:</strong> {formatearPesos(encargo.precio)}
+          </p>
+          <p>
+            <strong>Abono:</strong> {formatearPesos(encargo.abono)}
+          </p>
+          <p>
+            <strong>Saldo:</strong> {formatearPesos(encargo.saldo)}
+          </p>
+          <p>
+            <strong>Estado:</strong> {encargo.estado}
+          </p>
+
+          <button onClick={() => abrirEdicion(encargo)}>Editar encargo</button>
+
+          <br />
+          <br />
 
           {encargo.saldo > 0 && (
             <>
@@ -159,6 +340,9 @@ function ListarEncargos() {
             </>
           )}
 
+          <br />
+          <br />
+
           <select
             value={encargo.estado}
             onChange={(e) => cambiarEstado(encargo.id, e.target.value)}
@@ -171,7 +355,9 @@ function ListarEncargos() {
             <option value="cancelado">Cancelado</option>
           </select>
 
-          <p><strong>Fecha:</strong> {encargo.fecha_creacion}</p>
+          <p>
+            <strong>Fecha:</strong> {encargo.fecha_creacion}
+          </p>
 
           {encargo.foto && (
             <img
