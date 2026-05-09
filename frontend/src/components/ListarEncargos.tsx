@@ -470,7 +470,11 @@ function ListarEncargos() {
 
           {encargo.foto && (
             <img
-              src={`${import.meta.env.VITE_API_URL}${encargo.foto}`}
+              src={
+                encargo.foto?.startsWith("http")
+                  ? encargo.foto
+                  : `${import.meta.env.VITE_API_URL}${encargo.foto}`
+              }
               alt={encargo.referencia}
               className="imagen-encargo"
             />
