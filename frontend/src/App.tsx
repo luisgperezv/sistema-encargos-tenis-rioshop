@@ -2,6 +2,8 @@ import { useState } from "react";
 import { loginRequest } from "./services/api";
 import CrearEncargo from "./components/CrearEncargo";
 import ListarEncargos from "./components/ListarEncargos";
+import "./App.css";
+import logo from "./assets/logo.png";
 
 function App() {
   const [username, setUsername] = useState("");
@@ -26,41 +28,43 @@ function App() {
   };
 
   if (logueado) {
-  return (
-    <>
-      <CrearEncargo />
-      <ListarEncargos />
-    </>
-  );
-}
+    return (
+      <div className="app-panel">
+        <CrearEncargo />
+        <ListarEncargos />
+      </div>
+    );
+  }
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h1>🔐 Login Tenis Rio Shop</h1>
+    <div className="app-login">
+      <div className="login-card">
+        <img src={logo} alt="TENISRioSHOP" className="login-logo" />
 
-      <input
-        type="text"
-        placeholder="Usuario"
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
-      />
+        <h1>Sistema de Encargos</h1>
 
-      <br />
-      <br />
+        <p>Gestión profesional de pedidos</p>
 
-      <input
-        type="password"
-        placeholder="Contraseña"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-      />
+        <div className="login-form">
+          <input
+            type="text"
+            placeholder="Usuario"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+          />
 
-      <br />
-      <br />
+          <input
+            type="password"
+            placeholder="Contraseña"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
 
-      <button onClick={login}>Iniciar sesión</button>
+          <button onClick={login}>Iniciar sesión</button>
+        </div>
 
-      <p>{mensaje}</p>
+        {mensaje && <p className="login-mensaje">{mensaje}</p>}
+      </div>
     </div>
   );
 }
