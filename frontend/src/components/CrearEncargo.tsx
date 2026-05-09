@@ -10,6 +10,8 @@ import {
   crearProveedorRequest,
 } from "../services/api";
 
+import "./CrearEncargo.css";
+
 type Cliente = {
   id: number;
   nombre: string;
@@ -24,17 +26,18 @@ type Proveedor = {
 
 function CrearEncargo() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [clienteSeleccionado, setClienteSeleccionado] = useState<Cliente | null>(null);
+  const [clienteSeleccionado, setClienteSeleccionado] =
+    useState<Cliente | null>(null);
 
   const [nombreCliente, setNombreCliente] = useState("");
   const [telefonoCliente, setTelefonoCliente] = useState("");
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
-  const [proveedorSeleccionado, setProveedorSeleccionado] = useState<Proveedor | null>(null);
+  const [proveedorSeleccionado, setProveedorSeleccionado] =
+    useState<Proveedor | null>(null);
 
   const [nombreProveedor, setNombreProveedor] = useState("");
   const [telefonoProveedor, setTelefonoProveedor] = useState("");
 
- 
   const [referencia, setReferencia] = useState("");
   const [tallaCol, setTallaCol] = useState("");
   const [tallaEur, setTallaEur] = useState("");
@@ -48,31 +51,28 @@ function CrearEncargo() {
   const [cargando, setCargando] = useState(false);
 
   const cargarClientes = async () => {
-  const data = await listarClientesRequest();
+    const data = await listarClientesRequest();
 
-  if (Array.isArray(data)) {
-    setClientes(data);
-  }
-};
+    if (Array.isArray(data)) {
+      setClientes(data);
+    }
+  };
 
-const cargarProveedores = async () => {
-  const data = await listarProveedoresRequest();
+  const cargarProveedores = async () => {
+    const data = await listarProveedoresRequest();
 
-  if (Array.isArray(data)) {
-    setProveedores(data);
-  }
-};
+    if (Array.isArray(data)) {
+      setProveedores(data);
+    }
+  };
 
-
-useEffect(() => {
-
-  cargarClientes();
-  cargarProveedores();
-
-}, []);
+  useEffect(() => {
+    cargarClientes();
+    cargarProveedores();
+  }, []);
 
   const sugerenciasClientes = clientes.filter((cliente) =>
-    cliente.nombre.toLowerCase().includes(nombreCliente.toLowerCase())
+    cliente.nombre.toLowerCase().includes(nombreCliente.toLowerCase()),
   );
 
   const seleccionarCliente = (cliente: Cliente) => {
@@ -116,40 +116,40 @@ useEffect(() => {
   const crearEncargo = async () => {
     try {
       setCargando(true);
-    if (!nombreCliente.trim()) {
-      setMensaje("❌ Debes escribir el nombre del cliente");
-      return;
-    }
+      if (!nombreCliente.trim()) {
+        setMensaje("❌ Debes escribir el nombre del cliente");
+        return;
+      }
 
-    if (!telefonoCliente.trim()) {
-      setMensaje("❌ Debes escribir el teléfono del cliente");
-      return;
-    }
+      if (!telefonoCliente.trim()) {
+        setMensaje("❌ Debes escribir el teléfono del cliente");
+        return;
+      }
 
-    if (!proveedorSeleccionado) {
-      setMensaje("❌ Debes seleccionar o crear un proveedor");
-      return;
-    }
+      if (!proveedorSeleccionado) {
+        setMensaje("❌ Debes seleccionar o crear un proveedor");
+        return;
+      }
 
-    if (!referencia.trim()) {
-      setMensaje("❌ Debes escribir una referencia");
-      return;
-    }
+      if (!referencia.trim()) {
+        setMensaje("❌ Debes escribir una referencia");
+        return;
+      }
 
-    if (!tallaCol.trim()) {
-      setMensaje("❌ Debes escribir talla COL");
-      return;
-    }
+      if (!tallaCol.trim()) {
+        setMensaje("❌ Debes escribir talla COL");
+        return;
+      }
 
-    if (!tallaEur.trim()) {
-      setMensaje("❌ Debes escribir talla EUR");
-      return;
-    }
+      if (!tallaEur.trim()) {
+        setMensaje("❌ Debes escribir talla EUR");
+        return;
+      }
 
-    if (!precio || Number(precio) <= 0) {
-      setMensaje("❌ El precio debe ser mayor a 0");
-      return;
-    }
+      if (!precio || Number(precio) <= 0) {
+        setMensaje("❌ El precio debe ser mayor a 0");
+        return;
+      }
       if (!proveedorSeleccionado) {
         setMensaje("❌ Debes seleccionar o crear un proveedor");
         return;
@@ -243,265 +243,282 @@ useEffect(() => {
   };
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h1>Crear Encargo</h1>
+    <div className="crear-container">
+      <h1 className="crear-title">Crear Encargo</h1>
 
-      <h3>Cliente</h3>
+      <div className="seccion">
+        <h3>Cliente</h3>
 
-      <label>Nombre del cliente</label>
-      <br />
-      <input
-        placeholder="Ej: Luis Pérez"
-        value={nombreCliente}
-        onChange={(e) => {
-          setNombreCliente(e.target.value);
-          setClienteSeleccionado(null);
-        }}
-      />
+        <div className="grid-form">
+          <div className="campo">
+            <label>Nombre del cliente</label>
 
-      {nombreCliente && !clienteSeleccionado && sugerenciasClientes.length > 0 && (
-        <div style={{ border: "1px solid #ccc", padding: "8px", marginTop: "5px" }}>
-          {sugerenciasClientes.map((cliente) => (
-            <div
-              key={cliente.id}
-              onClick={() => seleccionarCliente(cliente)}
-              style={{ cursor: "pointer", padding: "5px" }}
-            >
-              {cliente.nombre} - {cliente.telefono}
-            </div>
-          ))}
+            <input
+              placeholder="Ej: Luis Pérez"
+              value={nombreCliente}
+              onChange={(e) => {
+                setNombreCliente(e.target.value);
+                setClienteSeleccionado(null);
+              }}
+            />
+
+            {nombreCliente &&
+              !clienteSeleccionado &&
+              sugerenciasClientes.length > 0 && (
+                <div className="sugerencias">
+                  {sugerenciasClientes.map((cliente) => (
+                    <div
+                      key={cliente.id}
+                      onClick={() => seleccionarCliente(cliente)}
+                      className="sugerencia-item"
+                    >
+                      {cliente.nombre} - {cliente.telefono}
+                    </div>
+                  ))}
+                </div>
+              )}
+          </div>
+
+          <div className="campo">
+            <label>Teléfono del cliente</label>
+
+            <input
+              placeholder="Ej: 3242697263"
+              value={telefonoCliente}
+              onChange={(e) => setTelefonoCliente(e.target.value)}
+            />
+          </div>
         </div>
-      )}
 
-      <br /><br />
+        {clienteSeleccionado && (
+          <div className="botones">
+            <button
+              className="btn btn-secondary"
+              disabled={cargando}
+              onClick={editarClienteSeleccionado}
+            >
+              Guardar cambios del cliente
+            </button>
+          </div>
+        )}
+      </div>
 
-      <label>Teléfono del cliente</label>
-      <br />
-      <input
-        placeholder="Ej: 3242697263"
-        value={telefonoCliente}
-        onChange={(e) => setTelefonoCliente(e.target.value)}
-      />
+      <div className="seccion">
+        <h3>Encargo</h3>
 
-      <br /><br />
+        <div className="grid-form">
+          <div className="campo">
+            <label>Proveedor</label>
 
-      {clienteSeleccionado && (
-        <>
-          <p>✅ Cliente seleccionado: {clienteSeleccionado.nombre}</p>
-          <button disabled={cargando} onClick={editarClienteSeleccionado}>
-            Guardar cambios del cliente
+            <select
+              value={proveedorSeleccionado?.id || ""}
+              onChange={(e) => {
+                const proveedor = proveedores.find(
+                  (p) => p.id === Number(e.target.value),
+                );
+
+                if (proveedor) {
+                  setProveedorSeleccionado(proveedor);
+
+                  setNombreProveedor(proveedor.nombre);
+                  setTelefonoProveedor(proveedor.telefono);
+                }
+              }}
+            >
+              <option value="">Selecciona proveedor</option>
+
+              {proveedores.map((proveedor) => (
+                <option key={proveedor.id} value={proveedor.id}>
+                  {proveedor.nombre} - {proveedor.telefono}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="campo">
+            <label>Nombre proveedor</label>
+
+            <input
+              placeholder="Nombre proveedor"
+              value={nombreProveedor}
+              onChange={(e) => setNombreProveedor(e.target.value)}
+            />
+          </div>
+
+          <div className="campo">
+            <label>Teléfono proveedor</label>
+
+            <input
+              placeholder="Teléfono proveedor"
+              value={telefonoProveedor}
+              onChange={(e) => setTelefonoProveedor(e.target.value)}
+            />
+          </div>
+
+          <div className="campo">
+            <label>Referencia</label>
+
+            <input
+              placeholder="Ej: Nike Panda"
+              value={referencia}
+              onChange={(e) => setReferencia(e.target.value)}
+            />
+          </div>
+
+          <div className="campo">
+            <label>Talla Colombia</label>
+
+            <input
+              placeholder="Ej: 38"
+              value={tallaCol}
+              onChange={(e) => setTallaCol(e.target.value)}
+            />
+          </div>
+
+          <div className="campo">
+            <label>Talla EUR</label>
+
+            <input
+              placeholder="Ej: 39"
+              value={tallaEur}
+              onChange={(e) => setTallaEur(e.target.value)}
+            />
+          </div>
+
+          <div className="campo">
+            <label>Precio</label>
+
+            <input
+              placeholder="Ej: 250000"
+              value={precio}
+              onChange={(e) => setPrecio(e.target.value)}
+            />
+          </div>
+
+          <div className="campo">
+            <label>Abono</label>
+
+            <input
+              placeholder="Ej: 50000"
+              value={abono}
+              onChange={(e) => setAbono(e.target.value)}
+            />
+          </div>
+
+          <div className="campo">
+            <label>Fecha estimada de entrega</label>
+
+            <input
+              type="date"
+              value={fechaEntrega}
+              onChange={(e) => setFechaEntrega(e.target.value)}
+            />
+          </div>
+
+          <div className="campo">
+            <label>Foto del producto</label>
+
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => setFoto(e.target.files?.[0] || null)}
+            />
+          </div>
+
+          <div className="campo">
+            <label>Observaciones</label>
+
+            <textarea
+              placeholder="Ej: Cliente quiere caja original"
+              value={observaciones}
+              onChange={(e) => setObservaciones(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="botones">
+          <button
+            className="btn btn-secondary"
+            disabled={cargando}
+            onClick={async () => {
+              try {
+                setCargando(true);
+
+                const respuesta = await crearProveedorRequest({
+                  nombre: nombreProveedor,
+                  telefono: telefonoProveedor,
+                });
+
+                if (respuesta.id) {
+                  setMensaje("✅ Proveedor creado correctamente");
+
+                  await cargarProveedores();
+
+                  setProveedorSeleccionado(respuesta);
+                } else if (respuesta.detail) {
+                  setMensaje(`❌ ${respuesta.detail}`);
+                } else {
+                  setMensaje("❌ Error al crear proveedor");
+                }
+              } catch (error) {
+                console.error(error);
+                setMensaje("❌ Error de conexión");
+              } finally {
+                setCargando(false);
+              }
+            }}
+          >
+            Crear proveedor
           </button>
-          <br /><br />
-        </>
-      )}
 
-      <h3>Encargo</h3>
+          {proveedorSeleccionado && (
+            <button
+              className="btn btn-secondary"
+              disabled={cargando}
+              onClick={async () => {
+                try {
+                  setCargando(true);
 
-      <label>Proveedor</label>
-<br />
+                  const respuesta = await editarProveedorRequest(
+                    proveedorSeleccionado.id,
+                    {
+                      nombre: nombreProveedor,
+                      telefono: telefonoProveedor,
+                    },
+                  );
 
-<select
-  value={proveedorSeleccionado?.id || ""}
-  onChange={(e) => {
-    const proveedor = proveedores.find(
-      (p) => p.id === Number(e.target.value)
-    );
+                  if (respuesta.id) {
+                    setMensaje("✅ Proveedor actualizado");
 
-    if (proveedor) {
-      setProveedorSeleccionado(proveedor);
-      
-      setNombreProveedor(proveedor.nombre);
-      setTelefonoProveedor(proveedor.telefono);
-    }
-  }}
->
-  <option value="">Selecciona proveedor</option>
+                    setProveedorSeleccionado(respuesta);
 
-  {proveedores.map((proveedor) => (
-    <option key={proveedor.id} value={proveedor.id}>
-      {proveedor.nombre} - {proveedor.telefono}
-    </option>
-  ))}
-</select>
+                    await cargarProveedores();
+                  } else {
+                    setMensaje("❌ Error al actualizar proveedor");
+                  }
+                } catch (error) {
+                  console.error(error);
+                  setMensaje("❌ Error de conexión");
+                } finally {
+                  setCargando(false);
+                }
+              }}
+            >
+              Guardar cambios proveedor
+            </button>
+          )}
 
-<br /><br />
+          <button
+            className="btn btn-primary"
+            disabled={cargando}
+            onClick={crearEncargo}
+          >
+            {cargando ? "Procesando..." : "Crear encargo"}
+          </button>
+        </div>
+      </div>
 
-<input
-  placeholder="Nombre proveedor"
-  value={nombreProveedor}
-  onChange={(e) => setNombreProveedor(e.target.value)}
-/>
-
-<br /><br />
-
-<input
-  placeholder="Teléfono proveedor"
-  value={telefonoProveedor}
-  onChange={(e) => setTelefonoProveedor(e.target.value)}
-/>
-
-<br />
-
-<button
-  disabled={cargando}
-  onClick={async () => {
-    try {
-      setCargando(true);
-
-      const respuesta = await crearProveedorRequest({
-        nombre: nombreProveedor,
-        telefono: telefonoProveedor,
-      });
-
-      if (respuesta.id) {
-        setMensaje("✅ Proveedor creado correctamente");
-
-        await cargarProveedores();
-
-        setProveedorSeleccionado(respuesta);
-        
-
-      } else if (respuesta.detail) {
-        setMensaje(`❌ ${respuesta.detail}`);
-      } else {
-        setMensaje("❌ Error al crear proveedor");
-      }
-    } catch (error) {
-      console.error(error);
-      setMensaje("❌ Error de conexión");
-    } finally {
-      setCargando(false);
-    }
-  }}
->
-  Crear proveedor
-</button>
-
-{proveedorSeleccionado && (
-  <>
-    <br /><br />
-
-    <button
-      disabled={cargando}
-      onClick={async () => {
-        try {
-          setCargando(true);
-
-          const respuesta = await editarProveedorRequest(
-            proveedorSeleccionado.id,
-            {
-              nombre: nombreProveedor,
-              telefono: telefonoProveedor,
-            }
-          );
-
-          if (respuesta.id) {
-            setMensaje("✅ Proveedor actualizado");
-
-            setProveedorSeleccionado(respuesta);
-
-            await cargarProveedores();
-          } else {
-            setMensaje("❌ Error al actualizar proveedor");
-          }
-        } catch (error) {
-          console.error(error);
-          setMensaje("❌ Error de conexión");
-        } finally {
-          setCargando(false);
-        }
-      }}
-    >
-      Guardar cambios proveedor
-    </button>
-  </>
-)}
-
-      <br /><br />
-
-      <label>Referencia</label>
-      <br />
-      <input
-        placeholder="Ej: Nike Panda"
-        value={referencia}
-        onChange={(e) => setReferencia(e.target.value)}
-      />
-
-      <br /><br />
-
-      <label>Talla Colombia</label>
-      <br />
-      <input
-        placeholder="Ej: 38"
-        value={tallaCol}
-        onChange={(e) => setTallaCol(e.target.value)}
-      />
-
-      <br /><br />
-
-      <label>Talla EUR</label>
-      <br />
-      <input
-        placeholder="Ej: 39"
-        value={tallaEur}
-        onChange={(e) => setTallaEur(e.target.value)}
-      />
-
-      <br /><br />
-
-      <label>Precio</label>
-      <br />
-      <input
-        placeholder="Ej: 250000"
-        value={precio}
-        onChange={(e) => setPrecio(e.target.value)}
-      />
-
-      <br /><br />
-
-      <label>Abono</label>
-      <br />
-      <input
-        placeholder="Ej: 50000"
-        value={abono}
-        onChange={(e) => setAbono(e.target.value)}
-      />
-
-      <br /><br />
-
-      <label>Fecha estimada de entrega</label>
-      <br />
-      <input
-        type="date"
-        value={fechaEntrega}
-        onChange={(e) => setFechaEntrega(e.target.value)}
-      />
-
-      <br /><br />
-
-      <label>Observaciones</label>
-      <br />
-      <textarea
-        placeholder="Ej: Cliente quiere caja original"
-        value={observaciones}
-        onChange={(e) => setObservaciones(e.target.value)}
-      />
-
-      <br /><br />
-
-      <label>Foto del producto</label>
-      <br />
-      <input
-        type="file"
-        accept="image/*"
-        onChange={(e) => setFoto(e.target.files?.[0] || null)}
-      />
-
-      <br /><br />
-
-      <button disabled={cargando} onClick={crearEncargo}>
-        {cargando ? "Procesando..." : "Crear encargo"}
-      </button>
+      <p className="mensaje">{mensaje}</p>
 
       <p>{mensaje}</p>
     </div>
