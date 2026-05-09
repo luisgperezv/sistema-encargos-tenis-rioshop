@@ -237,26 +237,32 @@ function ListarEncargos() {
               #{encargo.id} - {encargo.referencia}
             </h3>
 
-            <button
-              className="btn btn-primary"
-              onClick={() => abrirEdicion(encargo)}
-            >
-              Editar encargo
-            </button>
-            <button
-              className="btn btn-secondary"
-              onClick={() => {
-                const confirmar = window.confirm(
-                  "¿Seguro que deseas cancelar este encargo?",
-                );
+            {encargo.estado !== "entregado" &&
+              encargo.estado !== "cancelado" && (
+                <>
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => abrirEdicion(encargo)}
+                  >
+                    Editar encargo
+                  </button>
 
-                if (confirmar) {
-                  cambiarEstado(encargo.id, "cancelado");
-                }
-              }}
-            >
-              Cancelar
-            </button>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      const confirmar = window.confirm(
+                        "¿Seguro que deseas cancelar este encargo?",
+                      );
+
+                      if (confirmar) {
+                        cambiarEstado(encargo.id, "cancelado");
+                      }
+                    }}
+                  >
+                    Cancelar
+                  </button>
+                </>
+              )}
           </div>
 
           {encargoEditando?.id === encargo.id && (
