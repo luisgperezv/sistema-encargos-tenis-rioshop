@@ -134,19 +134,31 @@
 
 @media (max-width: 700px) {
   .main-header {
-    padding: 12px 15px;
+    grid-template-columns: 70px 1fr 95px;
+    padding: 10px 12px;
+    gap: 8px;
   }
 
   .header-logo {
-    width: 65px;
+    width: 58px;
   }
 
-  .header-left h2 {
+  .header-title h2 {
     font-size: 18px;
+    letter-spacing: 0.5px;
+    line-height: 1.1;
+    white-space: nowrap;
+  }
+
+  .header-title p {
+    font-size: 9px;
+    letter-spacing: 1.2px;
+    white-space: nowrap;
   }
 
   .logout-btn {
-    padding: 8px 12px;
-    font-size: 12px;
+    padding: 8px 10px;
+    font-size: 11px;
+    border-radius: 8px;
   }
 }
