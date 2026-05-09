@@ -1,71 +1,45 @@
 import { useState } from "react";
-import { loginRequest } from "./services/api";
-import CrearEncargo from "./components/CrearEncargo";
-import ListarEncargos from "./components/ListarEncargos";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import LoginPage from "./pages/LoginPage";
+import DashboardPage from "./pages/DashboardPage";
 import "./App.css";
-import logo from "./assets/logo.png";
 
 function App() {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [mensaje, setMensaje] = useState("");
-  const [logueado, setLogueado] = useState(false);
-
-  const login = async () => {
-    try {
-      const data = await loginRequest(username, password);
-
-      if (data.access_token) {
-        localStorage.setItem("token", data.access_token);
-        setMensaje("✅ Login exitoso");
-        setLogueado(true);
-      } else {
-        setMensaje("❌ Credenciales incorrectas");
-      }
-    } catch (error) {
-      setMensaje("❌ Error en login");
-    }
-  };
-
-  if (logueado) {
-    return (
-      <div className="app-panel">
-        <CrearEncargo />
-        <ListarEncargos />
-      </div>
-    );
-  }
+  const [logueado, setLogueado] = useState(
+    !!localStorage.getItem("token")
+  );
 
   return (
-    <div className="app-login">
-      <div className="login-card">
-        <img src={logo} alt="TENISRioSHOP" className="login-logo" />
+    <BrowserRouter>
+      <Routes>
+        <Route
+          path="/login"
+          element={
+            logueado ? (
+              <Navigate to="/dashboard" />
+            ) : (
+              <LoginPage onLogin={() => setLogueado(true)} />
+            )
+          }
+        />
 
-        <h1>Sistema de Encargos</h1>
+        <Route
+          path="/dashboard"
+          element={
+            logueado ? (
+              <DashboardPage />
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
 
-        <p>Gestión profesional de pedidos</p>
-
-        <div className="login-form">
-          <input
-            type="text"
-            placeholder="Usuario"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-          />
-
-          <input
-            type="password"
-            placeholder="Contraseña"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-
-          <button onClick={login}>Iniciar sesión</button>
-        </div>
-
-        {mensaje && <p className="login-mensaje">{mensaje}</p>}
-      </div>
-    </div>
+        <Route
+          path="*"
+          element={<Navigate to={logueado ? "/dashboard" : "/login"} />}
+        />
+      </Routes>
+    </BrowserRouter>
   );
 }
 

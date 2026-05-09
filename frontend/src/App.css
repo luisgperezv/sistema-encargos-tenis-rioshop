@@ -79,3 +79,74 @@
 .login-card p {
   margin-bottom: 10px;
 }
+
+.main-header {
+  background: #111827;
+  color: white;
+  padding: 14px 30px;
+  display: grid;
+  grid-template-columns: 180px 1fr 180px;
+  align-items: center;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+}
+
+.header-logo {
+  width: 130px;
+  object-fit: contain;
+}
+
+.header-title {
+  text-align: center;
+}
+
+.header-title h2 {
+  margin: 0;
+  font-size: 28px;
+  letter-spacing: 1px;
+  color: #facc15;
+}
+
+.header-title p {
+  margin: 0;
+  font-size: 14px;
+  letter-spacing: 2px;
+  color: #ffffff;
+}
+
+.logout-btn {
+  justify-self: end;
+  background: #facc15;
+  color: #111827;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+@media (max-width: 700px) {
+  .main-header {
+    padding: 12px 15px;
+  }
+
+  .header-logo {
+    width: 65px;
+  }
+
+  .header-left h2 {
+    font-size: 18px;
+  }
+
+  .logout-btn {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+}
