@@ -204,7 +204,7 @@ def listar_encargos(
             )
         )
 
-    encargos = query.all()
+    encargos = query.order_by(Encargo.id.desc()).all()
     return encargos
 
 
