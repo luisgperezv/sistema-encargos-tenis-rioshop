@@ -387,27 +387,29 @@ function ListarEncargos() {
           </div>
 
           <div className="acciones">
-            {encargo.saldo > 0 && (
-              <>
-                <input
-                  placeholder="Nuevo abono"
-                  value={abonos[encargo.id] || ""}
-                  onChange={(e) =>
-                    setAbonos((prev) => ({
-                      ...prev,
-                      [encargo.id]: e.target.value,
-                    }))
-                  }
-                />
+            {encargo.saldo > 0 &&
+              encargo.estado !== "cancelado" &&
+              encargo.estado !== "entregado" && (
+                <>
+                  <input
+                    placeholder="Nuevo abono"
+                    value={abonos[encargo.id] || ""}
+                    onChange={(e) =>
+                      setAbonos((prev) => ({
+                        ...prev,
+                        [encargo.id]: e.target.value,
+                      }))
+                    }
+                  />
 
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => agregarAbono(encargo.id)}
-                >
-                  Agregar abono
-                </button>
-              </>
-            )}
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => agregarAbono(encargo.id)}
+                  >
+                    Agregar abono
+                  </button>
+                </>
+              )}
 
             <select
               value={encargo.estado}
