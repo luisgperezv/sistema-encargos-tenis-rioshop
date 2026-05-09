@@ -52,7 +52,7 @@
   border-radius: 16px;
   padding: 20px;
   margin-bottom: 20px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .card-header {
@@ -118,5 +118,38 @@
   .info-grid,
   .editor-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+.dashboard-resumen {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 25px;
+}
+
+.dashboard-card {
+  background: #111827;
+  color: white;
+  padding: 16px;
+  border-radius: 14px;
+  text-align: center;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+}
+
+.dashboard-card span {
+  display: block;
+  font-size: 13px;
+  opacity: 0.8;
+  margin-bottom: 6px;
+}
+
+.dashboard-card strong {
+  font-size: 22px;
+}
+
+@media (max-width: 900px) {
+  .dashboard-resumen {
+    grid-template-columns: repeat(2, 1fr);
   }
 }

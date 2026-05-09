@@ -47,6 +47,24 @@ function ListarEncargos() {
   const [editObservaciones, setEditObservaciones] = useState("");
   const [editProveedorId, setEditProveedorId] = useState("");
   const [editFoto, setEditFoto] = useState<File | null>(null);
+  const totalEncargos = encargos.length;
+
+  const totalPendientes = encargos.filter(
+    (encargo) => encargo.estado === "pendiente",
+  ).length;
+
+  const totalEnLocal = encargos.filter(
+    (encargo) => encargo.estado === "en_local",
+  ).length;
+
+  const totalEntregados = encargos.filter(
+    (encargo) => encargo.estado === "entregado",
+  ).length;
+
+  const saldoTotal = encargos.reduce(
+    (total, encargo) => total + Number(encargo.saldo || 0),
+    0,
+  );
 
   const cargarEncargos = async () => {
     const data = await listarEncargosRequest(buscar, estadoFiltro);
@@ -220,6 +238,32 @@ function ListarEncargos() {
         <button className="btn btn-primary" onClick={cargarEncargos}>
           Buscar
         </button>
+      </div>
+      <div className="dashboard-resumen">
+        <div className="dashboard-card">
+          <span>Total</span>
+          <strong>{totalEncargos}</strong>
+        </div>
+
+        <div className="dashboard-card">
+          <span>Pendientes</span>
+          <strong>{totalPendientes}</strong>
+        </div>
+
+        <div className="dashboard-card">
+          <span>En local</span>
+          <strong>{totalEnLocal}</strong>
+        </div>
+
+        <div className="dashboard-card">
+          <span>Entregados</span>
+          <strong>{totalEntregados}</strong>
+        </div>
+
+        <div className="dashboard-card">
+          <span>Saldo por cobrar</span>
+          <strong>{formatearPesos(saldoTotal)}</strong>
+        </div>
       </div>
 
       {mensaje && <p className="mensaje">{mensaje}</p>}
