@@ -153,3 +153,45 @@
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+@media (max-width: 700px) {
+  .encargos-container {
+    padding: 22px 12px;
+  }
+
+  .encargos-title {
+    font-size: 28px;
+  }
+
+  .card-encargo {
+    padding: 18px;
+    border-radius: 18px;
+  }
+
+  .card-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .card-header h3 {
+    font-size: 22px;
+    text-align: center;
+  }
+
+  .acciones {
+    flex-direction: column;
+  }
+
+  .acciones input,
+  .acciones select,
+  .acciones button {
+    width: 100%;
+  }
+
+  .imagen-encargo {
+    width: 100%;
+    max-width: 260px;
+    display: block;
+    margin: 18px auto 0 auto;
+  }
+}
