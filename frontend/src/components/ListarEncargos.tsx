@@ -5,6 +5,7 @@ import {
   agregarAbonoEncargoRequest,
   editarEncargoRequest,
   listarProveedoresRequest,
+  subirImagenRequest,
 } from "../services/api";
 
 import "./ListarEncargos.css";
@@ -45,6 +46,7 @@ function ListarEncargos() {
   const [editFechaEntrega, setEditFechaEntrega] = useState("");
   const [editObservaciones, setEditObservaciones] = useState("");
   const [editProveedorId, setEditProveedorId] = useState("");
+  const [editFoto, setEditFoto] = useState<File | null>(null);
 
   const cargarEncargos = async () => {
     const data = await listarEncargosRequest(buscar, estadoFiltro);
@@ -110,6 +112,7 @@ function ListarEncargos() {
     setEditProveedorId(
       encargo.proveedor_id ? String(encargo.proveedor_id) : "",
     );
+    setEditFoto(null);
   };
 
   const guardarEdicion = async () => {
@@ -133,13 +136,27 @@ function ListarEncargos() {
       setMensaje("❌ El precio debe ser mayor a 0");
       return;
     }
+    let rutaFoto = encargoEditando.foto || null;
+
+    if (editFoto) {
+      setMensaje("⏳ Subiendo nueva foto...");
+
+      const imagenSubida = await subirImagenRequest(editFoto);
+
+      if (!imagenSubida.ruta) {
+        setMensaje("❌ Error al subir la nueva foto");
+        return;
+      }
+
+      rutaFoto = imagenSubida.ruta;
+    }
 
     const respuesta = await editarEncargoRequest(encargoEditando.id, {
       proveedor_id: editProveedorId ? Number(editProveedorId) : null,
       referencia: editReferencia,
       talla_col: editTallaCol,
       talla_eur: editTallaEur,
-      foto: encargoEditando.foto || null,
+      foto: rutaFoto,
       precio: Number(editPrecio),
       fecha_entrega_estimada: editFechaEntrega || null,
       observaciones: editObservaciones || null,
@@ -153,6 +170,7 @@ function ListarEncargos() {
       );
 
       setEncargoEditando(null);
+      setEditFoto(null);
       setMensaje("✅ Encargo actualizado correctamente");
     } else if (respuesta.detail) {
       setMensaje(`❌ ${respuesta.detail}`);
@@ -295,6 +313,14 @@ function ListarEncargos() {
                     onChange={(e) => setEditObservaciones(e.target.value)}
                   />
                 </div>
+              </div>
+              <div>
+                <label>Cambiar foto</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setEditFoto(e.target.files?.[0] || null)}
+                />
               </div>
 
               <div className="acciones">
