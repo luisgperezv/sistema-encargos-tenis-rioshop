@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
+import NuevoEncargoPage from "./pages/NuevoEncargoPage";
+import EncargosPage from "./pages/EncargosPage";
+
 import "./App.css";
 
 function App() {
@@ -12,6 +16,7 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+
         <Route
           path="/login"
           element={
@@ -35,9 +40,34 @@ function App() {
         />
 
         <Route
-          path="*"
-          element={<Navigate to={logueado ? "/dashboard" : "/login"} />}
+          path="/dashboard/nuevo"
+          element={
+            logueado ? (
+              <NuevoEncargoPage />
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
         />
+
+        <Route
+          path="/dashboard/encargos"
+          element={
+            logueado ? (
+              <EncargosPage />
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+
+        <Route
+          path="*"
+          element={
+            <Navigate to={logueado ? "/dashboard" : "/login"} />
+          }
+        />
+
       </Routes>
     </BrowserRouter>
   );

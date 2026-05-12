@@ -11,12 +11,12 @@ import {
 import "./ListarEncargos.css";
 
 const colorEstado = (estado: string) => {
-  if (estado === "pendiente") return "#ffd6d6";
-  if (estado === "despachado") return "#fff3bf";
-  if (estado === "entregado") return "#d3f9d8";
-  if (estado === "pedido") return "#d0ebff";
-  if (estado === "en_local") return "#e5dbff";
-  if (estado === "cancelado") return "#dee2e6";
+  if (estado === "pendiente") return "#fecaca";
+  if (estado === "pedido") return "#dbeafe";
+  if (estado === "despachado") return "rgb(237, 220, 93)";
+  if (estado === "en_local") return "#fed7aa";
+  if (estado === "entregado") return "#09f35b";
+  if (estado === "cancelado") return "#e5e7eb";
 
   return "#ffffff";
 };
@@ -47,6 +47,7 @@ function ListarEncargos() {
   const [editObservaciones, setEditObservaciones] = useState("");
   const [editProveedorId, setEditProveedorId] = useState("");
   const [editFoto, setEditFoto] = useState<File | null>(null);
+
   const totalEncargos = encargos.length;
 
   const totalPendientes = encargos.filter(
@@ -135,6 +136,7 @@ function ListarEncargos() {
 
   const guardarEdicion = async () => {
     if (!encargoEditando) return;
+
     if (!editReferencia.trim()) {
       setMensaje("❌ La referencia es obligatoria");
       return;
@@ -154,6 +156,7 @@ function ListarEncargos() {
       setMensaje("❌ El precio debe ser mayor a 0");
       return;
     }
+
     let rutaFoto = encargoEditando.foto || null;
 
     if (editFoto) {
@@ -239,6 +242,7 @@ function ListarEncargos() {
           Buscar
         </button>
       </div>
+
       <div className="dashboard-resumen">
         <div className="dashboard-card">
           <span>Total</span>
@@ -277,22 +281,28 @@ function ListarEncargos() {
           }}
         >
           <div className="card-header">
-            <h3>
-              #{encargo.id} - {encargo.referencia}
-            </h3>
+            <div>
+              <h3>
+                #{encargo.id} - {encargo.referencia}
+              </h3>
+
+              <span className={`estado-badge estado-${encargo.estado}`}>
+                {encargo.estado.replace("_", " ")}
+              </span>
+            </div>
 
             {encargo.estado !== "entregado" &&
               encargo.estado !== "cancelado" && (
-                <>
+                <div className="acciones-header">
                   <button
                     className="btn btn-primary"
                     onClick={() => abrirEdicion(encargo)}
                   >
-                    Editar encargo
+                    Editar
                   </button>
 
                   <button
-                    className="btn btn-secondary"
+                    className="btn btn-danger"
                     onClick={() => {
                       const confirmar = window.confirm(
                         "¿Seguro que deseas cancelar este encargo?",
@@ -305,7 +315,7 @@ function ListarEncargos() {
                   >
                     Cancelar
                   </button>
-                </>
+                </div>
               )}
           </div>
 
@@ -378,6 +388,7 @@ function ListarEncargos() {
                   />
                 </div>
               </div>
+
               <div>
                 <label>Cambiar foto</label>
                 <input
@@ -402,83 +413,96 @@ function ListarEncargos() {
             </div>
           )}
 
-          <div className="info-grid">
-            <p>
-              <strong>Cliente:</strong> {encargo.cliente?.nombre}
-            </p>
-            <p>
-              <strong>Proveedor:</strong> {encargo.proveedor?.nombre}
-            </p>
-            <p>
-              <strong>Talla:</strong> COL {encargo.talla_col} / EUR{" "}
-              {encargo.talla_eur}
-            </p>
-            <p>
-              <strong>Precio:</strong> {formatearPesos(encargo.precio)}
-            </p>
-            <p>
-              <strong>Abono:</strong> {formatearPesos(encargo.abono)}
-            </p>
-            <p>
-              <strong>Saldo:</strong> {formatearPesos(encargo.saldo)}
-            </p>
-            <p>
-              <strong>Estado:</strong> {encargo.estado}
-            </p>
-            <p>
-              <strong>Fecha:</strong> {encargo.fecha_creacion}
-            </p>
-          </div>
-
-          <div className="acciones">
-            {encargo.saldo > 0 &&
-              encargo.estado !== "cancelado" &&
-              encargo.estado !== "entregado" && (
-                <>
-                  <input
-                    placeholder="Nuevo abono"
-                    value={abonos[encargo.id] || ""}
-                    onChange={(e) =>
-                      setAbonos((prev) => ({
-                        ...prev,
-                        [encargo.id]: e.target.value,
-                      }))
-                    }
-                  />
-
-                  <button
-                    className="btn btn-secondary"
-                    onClick={() => agregarAbono(encargo.id)}
-                  >
-                    Agregar abono
-                  </button>
-                </>
+          <div className="card-body">
+            <div className="columna-imagen">
+              {encargo.foto && (
+                <img
+                  src={
+                    encargo.foto?.startsWith("http")
+                      ? encargo.foto
+                      : `${import.meta.env.VITE_API_URL}${encargo.foto}`
+                  }
+                  alt={encargo.referencia}
+                  className="imagen-encargo"
+                />
               )}
+            </div>
 
-            <select
-              value={encargo.estado}
-              onChange={(e) => cambiarEstado(encargo.id, e.target.value)}
-            >
-              <option value="pendiente">Pendiente</option>
-              <option value="pedido">Pedido</option>
-              <option value="despachado">Despachado</option>
-              <option value="en_local">En local</option>
-              <option value="entregado">Entregado</option>
-              <option value="cancelado">Cancelado</option>
-            </select>
+            <div className="columna-info">
+              <div className="info-grid">
+                <p>
+                  <strong>Cliente:</strong> {encargo.cliente?.nombre}
+                </p>
+
+                <p>
+                  <strong>Proveedor:</strong> {encargo.proveedor?.nombre}
+                </p>
+
+                <p>
+                  <strong>Talla:</strong> COL {encargo.talla_col} / EUR{" "}
+                  {encargo.talla_eur}
+                </p>
+
+                <p>
+                  <strong>Precio:</strong> {formatearPesos(encargo.precio)}
+                </p>
+
+                <p>
+                  <strong>Abono:</strong> {formatearPesos(encargo.abono)}
+                </p>
+
+                <p>
+                  <strong>Saldo:</strong> {formatearPesos(encargo.saldo)}
+                </p>
+
+                <p>
+                  <strong>Estado:</strong> {encargo.estado}
+                </p>
+
+                <p>
+                  <strong>Fecha:</strong> {encargo.fecha_creacion}
+                </p>
+              </div>
+
+              <div className="acciones">
+                {encargo.saldo > 0 &&
+                  encargo.estado !== "cancelado" &&
+                  encargo.estado !== "entregado" && (
+                    <>
+                      <input
+                        placeholder="Nuevo abono"
+                        value={abonos[encargo.id] || ""}
+                        onChange={(e) =>
+                          setAbonos((prev) => ({
+                            ...prev,
+                            [encargo.id]: e.target.value,
+                          }))
+                        }
+                      />
+
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => agregarAbono(encargo.id)}
+                      >
+                        Agregar abono
+                      </button>
+                    </>
+                  )}
+
+                <select
+                  value={encargo.estado}
+                  onChange={(e) => cambiarEstado(encargo.id, e.target.value)}
+                >
+                  <option value="pendiente">Pendiente</option>
+                  <option value="pedido">Pedido</option>
+                  <option value="despachado">Despachado</option>
+                  <option value="en_local">En local</option>
+                  <option value="entregado">Entregado</option>
+                  <option value="cancelado">Cancelado</option>
+                </select>
+              </div>
+            </div>
           </div>
-
-          {encargo.foto && (
-            <img
-              src={
-                encargo.foto?.startsWith("http")
-                  ? encargo.foto
-                  : `${import.meta.env.VITE_API_URL}${encargo.foto}`
-              }
-              alt={encargo.referencia}
-              className="imagen-encargo"
-            />
-          )}
         </div>
       ))}
     </div>
