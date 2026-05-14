@@ -23,6 +23,7 @@ app.add_middleware(
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "https://merry-appreciation-production-135b.up.railway.app",
+        "https://encargos.tenisrioshop.com",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -38,6 +39,7 @@ app.include_router(encargo_router.router)
 app.include_router(proveedor_router.router)
 app.include_router(auth_router.router)
 
+
 @app.get("/")
 def root():
     return {"mensaje": "API funcionando correctamente"}
@@ -45,11 +47,12 @@ def root():
 
 VERIFY_TOKEN = "tenisrio123"
 
+
 @app.get("/webhook")
 def verificar_webhook(
     hub_mode: str = Query(None, alias="hub.mode"),
     hub_challenge: str = Query(None, alias="hub.challenge"),
-    hub_verify_token: str = Query(None, alias="hub.verify_token")
+    hub_verify_token: str = Query(None, alias="hub.verify_token"),
 ):
     if hub_mode == "subscribe" and hub_verify_token == VERIFY_TOKEN:
         return int(hub_challenge)
