@@ -263,6 +263,68 @@ def obtener_encargo(
 
     return encargo
 
+@router.post("/encargos/{encargo_id}/reenviar-proveedor")
+def reenviar_encargo_proveedor(
+    encargo_id: int,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user),
+):
+    encargo = db.query(Encargo).filter(Encargo.id == encargo_id).first()
+
+    if not encargo:
+        raise HTTPException(status_code=404, detail="El encargo no existe")
+
+    if encargo.estado in ["despachado", "en_local", "entregado", "cancelado"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Este encargo ya no debería reenviarse al proveedor",
+        )
+
+    if not encargo.proveedor:
+        raise HTTPException(
+            status_code=400,
+            detail="Este encargo no tiene proveedor asignado",
+        )
+
+    try:
+        if encargo.foto:
+            respuesta = enviar_template_proveedor_foto(
+                numero=encargo.proveedor.telefono,
+                image_url=encargo.foto,
+                referencia=encargo.referencia,
+                talla_eur=encargo.talla_eur,
+            )
+        else:
+            respuesta = enviar_template_proveedor_encargo(
+                numero=encargo.proveedor.telefono,
+                referencia=encargo.referencia,
+                talla_eur=encargo.talla_eur,
+            )
+
+        print("REENVÍO WHATSAPP PROVEEDOR:", respuesta)
+
+        if respuesta.get("error"):
+            raise HTTPException(
+                status_code=400,
+                detail=respuesta["error"].get("message", "Error enviando WhatsApp"),
+            )
+
+        return {
+            "mensaje": "Encargo reenviado al proveedor correctamente",
+            "encargo_id": encargo.id,
+            "proveedor": encargo.proveedor.nombre,
+            "respuesta_whatsapp": respuesta,
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        print("Error reenviando encargo al proveedor:", e)
+        raise HTTPException(
+            status_code=500,
+            detail="Error reenviando encargo al proveedor",
+        )
 
 @router.delete("/encargos/{encargo_id}")
 def eliminar_encargo(

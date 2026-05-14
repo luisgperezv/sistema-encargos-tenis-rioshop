@@ -6,6 +6,7 @@ import {
   editarEncargoRequest,
   listarProveedoresRequest,
   subirImagenRequest,
+  reenviarEncargoProveedorRequest,
 } from "../services/api";
 
 import "./ListarEncargos.css";
@@ -117,6 +118,26 @@ function ListarEncargos() {
       alert(respuesta.detail);
     } else {
       alert("Error al agregar abono");
+    }
+  };
+
+  const reenviarAlProveedor = async (encargo: any) => {
+    const confirmar = window.confirm(
+      `¿Reenviar el encargo #${encargo.id} al proveedor ${encargo.proveedor?.nombre || ""}?`,
+    );
+
+    if (!confirmar) return;
+
+    setMensaje("⏳ Reenviando encargo al proveedor...");
+
+    const respuesta = await reenviarEncargoProveedorRequest(encargo.id);
+
+    if (respuesta.mensaje) {
+      setMensaje(`✅ ${respuesta.mensaje}`);
+    } else if (respuesta.detail) {
+      setMensaje(`❌ ${respuesta.detail}`);
+    } else {
+      setMensaje("❌ Error al reenviar encargo al proveedor");
     }
   };
 
@@ -487,6 +508,17 @@ function ListarEncargos() {
                         Agregar abono
                       </button>
                     </>
+                  )}
+
+                {encargo.proveedor &&
+                  (encargo.estado === "pendiente" ||
+                    encargo.estado === "pedido") && (
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => reenviarAlProveedor(encargo)}
+                    >
+                      Reenviar al proveedor
+                    </button>
                   )}
 
                 <select
