@@ -1,102 +1,142 @@
 # Sistema de Encargos - TENISRioSHOP
 
-Sistema web desarrollado para la gestión de encargos, clientes y proveedores de TENISRioSHOP.
+![Python](https://img.shields.io/badge/Python-3.11-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-Backend-green)
+![React](https://img.shields.io/badge/React-Frontend-61dafb)
+![TypeScript](https://img.shields.io/badge/TypeScript-Frontend-blue)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Database-336791)
+![Railway](https://img.shields.io/badge/Deploy-Railway-purple)
+![Cloudinary](https://img.shields.io/badge/Cloudinary-Images-blue)
+![WhatsApp API](https://img.shields.io/badge/API-WhatsApp-success)
 
-## Características
+Sistema web profesional desarrollado para la gestión de encargos, clientes y proveedores de TENISRioSHOP.
 
-- Gestión de clientes
-- Gestión de proveedores
-- Creación y edición de encargos
-- Control de abonos y saldos
-- Estados de encargos
-- Carga de imágenes
-- Dashboard administrativo
-- Filtros de búsqueda
-- Integración con WhatsApp Cloud API
-- Diseño responsive
+Proyecto real enfocado en automatización de procesos comerciales, integración de APIs y arquitectura full stack moderna.
 
 ---
 
-## Tecnologías utilizadas
+# Demo en producción
 
-### Backend
-- Python
-- FastAPI
-- PostgreSQL
-- SQLAlchemy
-- JWT Authentication
-- REST API
+Frontend:
 
-### Frontend
-- React
-- TypeScript
-- Vite
-- CSS Responsive
+https://encargos.tenisrioshop.com/login
 
-### DevOps & Tools
-- Railway
-- GitHub
-- Git
-- Postman
+Backend API:
+
+https://sistema-encargos-tenis-rioshop-production.up.railway.app/docs
 
 ---
 
-## Arquitectura
+# Capturas del sistema
 
-Frontend desarrollado en React + TypeScript consumiendo una API REST desarrollada con FastAPI y PostgreSQL.
-
-El sistema permite administrar encargos de tenis con validaciones de negocio, control de estados y automatización de notificaciones vía WhatsApp.
-
----
-
-## Funcionalidades principales
-
----
-
-## Capturas del sistema
-
-### Login
+## Login
 
 ![Login](./assets/screenshots/login.png)
 
-### Crear encargo
+---
 
-![Crear encargo](./assets/screenshots/formulario.png)
+## Crear encargo
 
-### Formulario de encargo
-
-![Formulario encargo](./assets/screenshots/formulario_1.png)
-
-### Dashboard y listado de encargos
-
-![Dashboard](./assets/screenshots/dashboard.png)
-
-### Encargos
-- Crear encargos
-- Editar encargos
-- Cancelar encargos
-- Cambiar estados
-- Agregar abonos
-- Control automático de saldo
-
-### Clientes
-- Registro automático de clientes
-- Asociación cliente-encargo
-
-### Proveedores
-- Gestión de proveedores
-- Reenvío de encargos pendientes
-
-### Dashboard
-- Total de encargos
-- Pendientes
-- En local
-- Entregados
-- Saldo por cobrar
+![Formulario](./assets/screenshots/formulario.png)
 
 ---
 
-## Estados del sistema
+## Formulario avanzado
+
+![Formulario avanzado](./assets/screenshots/formulario_1.png)
+
+---
+
+## Dashboard y listado de encargos
+
+![Dashboard](./assets/screenshots/dashboard.png)
+
+---
+
+# Arquitectura del sistema
+
+```text
+Usuario / Empleado
+        |
+        v
+Frontend React + TypeScript
+        |
+        v
+API REST - FastAPI
+        |
+        v
+PostgreSQL - Railway
+        |
+        +--> Cloudinary - almacenamiento de imágenes
+        |
+        +--> WhatsApp Cloud API - notificaciones automáticas
+```
+
+---
+
+# Funcionalidades principales
+
+- Gestión de clientes
+- Gestión de proveedores
+- Creación de encargos
+- Edición de encargos
+- Control de abonos y saldos
+- Estados de pedidos
+- Subida de imágenes
+- Dashboard administrativo
+- Filtros y búsqueda
+- Integración con WhatsApp
+- Diseño responsive
+- Autenticación JWT
+- API REST documentada con Swagger
+
+---
+
+# Tecnologías utilizadas
+
+## Backend
+
+- Python
+- FastAPI
+- SQLAlchemy
+- PostgreSQL
+- JWT Authentication
+- Uvicorn
+- Pydantic
+
+## Frontend
+
+- React
+- TypeScript
+- Vite
+- CSS3
+
+## Infraestructura y servicios
+
+- Railway
+- Cloudinary
+- GitHub
+- WhatsApp Cloud API
+
+---
+
+# Características técnicas
+
+- Arquitectura cliente-servidor
+- API RESTful
+- Manejo de CORS
+- Variables de entorno
+- Deploy en producción
+- Dominio personalizado
+- Integración de servicios externos
+- Upload de imágenes en la nube
+- Validaciones backend
+- Manejo de autenticación segura
+- Base de datos relacional
+
+---
+
+# Estados del sistema
 
 - Pendiente
 - Pedido
@@ -107,16 +147,33 @@ El sistema permite administrar encargos de tenis con validaciones de negocio, co
 
 ---
 
-## Despliegue
+# Próximas mejoras
 
-- Frontend desplegado en Railway
-- Backend desplegado en Railway
-- Base de datos PostgreSQL
+- Roles y permisos
+- Inventario
+- Dashboard avanzado
+- Estadísticas de ventas
+- Notificaciones en tiempo real
+- Docker
+- Tests automáticos
+- CI/CD con GitHub Actions
+- Pasarela de pagos
+- Multiusuario
 
 ---
 
-## Autor
+# Autor
 
-Luis Guillermo Perez Velandia
+## Luis Guillermo Perez Velandia
 
-Backend Developer Junior                                                                                                                     
+Backend Developer enfocado en Python, FastAPI, PostgreSQL, React y automatización de procesos mediante inteligencia artificial.
+
+Actualmente desarrollando soluciones reales para negocio utilizando arquitectura full stack moderna e integración de APIs.
+
+GitHub:
+
+https://github.com/luisgperezv
+
+LinkedIn:
+
+https://www.linkedin.com/in/luis-guillermo-perez-dev
