@@ -51,6 +51,26 @@ El sistema permite administrar encargos de tenis con validaciones de negocio, co
 
 ## Funcionalidades principales
 
+---
+
+## Capturas del sistema
+
+### Login
+
+![Login](./assets/screenshots/login.png)
+
+### Crear encargo
+
+![Crear encargo](./assets/screenshots/formulario.png)
+
+### Formulario de encargo
+
+![Formulario encargo](./assets/screenshots/formulario_1.png)
+
+### Dashboard y listado de encargos
+
+![Dashboard](./assets/screenshots/dashboard.png)
+
 ### Encargos
 - Crear encargos
 - Editar encargos
