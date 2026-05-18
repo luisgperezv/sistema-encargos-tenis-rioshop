@@ -106,3 +106,92 @@
     grid-template-columns: 1fr;
   }
 }
+
+.btn-outline {
+  background: white;
+  color: #111827;
+  border: 2px solid #111827;
+}
+
+.btn-outline:hover {
+  background: #f3f4f6;
+}
+
+.btn-danger {
+  background: #ef4444;
+  color: white;
+}
+
+.btn-danger:hover {
+  background: #dc2626;
+}
+
+.botones-acciones-producto {
+  margin-top: 25px;
+  margin-bottom: 25px;
+  border-bottom: 1px dashed #e5e7eb;
+  padding-bottom: 25px;
+  justify-content: flex-end;
+}
+
+.botones-proveedor {
+  margin-top: 15px;
+}
+
+.lista-productos {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.producto-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+}
+
+.producto-actual {
+  border-style: dashed;
+  background: #f3f4f6;
+  opacity: 0.8;
+}
+
+.producto-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.producto-info strong {
+  font-size: 15px;
+}
+
+.producto-info small {
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.btn-eliminar-producto {
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 16px;
+}
+
+.seccion-final {
+  display: flex;
+  justify-content: center;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+}
+
+.btn-crear-encargos {
+  width: 100%;
+  max-width: 400px;
+  padding: 15px;
+  font-size: 16px;
+}

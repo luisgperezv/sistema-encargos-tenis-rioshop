@@ -24,6 +24,20 @@ type Proveedor = {
   telefono: string;
 };
 
+interface ProductoAgregado {
+  id_temp: string;
+  proveedor_id: number;
+  nombreProveedor: string;
+  referencia: string;
+  tallaCol: string;
+  tallaEur: string;
+  precio: string;
+  abono: string;
+  fechaEntrega: string;
+  foto: File | null;
+  observaciones: string;
+}
+
 function CrearEncargo() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [clienteSeleccionado, setClienteSeleccionado] =
@@ -46,6 +60,8 @@ function CrearEncargo() {
   const [fechaEntrega, setFechaEntrega] = useState("");
   const [observaciones, setObservaciones] = useState("");
   const [foto, setFoto] = useState<File | null>(null);
+
+  const [productosAgregados, setProductosAgregados] = useState<ProductoAgregado[]>([]);
 
   const [mensaje, setMensaje] = useState("");
   const [cargando, setCargando] = useState(false);
@@ -113,9 +129,70 @@ function CrearEncargo() {
     }
   };
 
+  const agregarProductoLista = () => {
+    if (!proveedorSeleccionado) {
+      setMensaje("❌ Debes seleccionar o crear un proveedor antes de agregar el producto");
+      return;
+    }
+    if (!referencia.trim()) {
+      setMensaje("❌ Debes escribir una referencia");
+      return;
+    }
+    if (!tallaCol.trim()) {
+      setMensaje("❌ Debes escribir talla COL");
+      return;
+    }
+    if (!tallaEur.trim()) {
+      setMensaje("❌ Debes escribir talla EUR");
+      return;
+    }
+    if (!precio || Number(precio) <= 0) {
+      setMensaje("❌ El precio debe ser mayor a 0");
+      return;
+    }
+
+    const nuevoProducto: ProductoAgregado = {
+      id_temp: Date.now().toString() + Math.random().toString(36).substring(7),
+      proveedor_id: proveedorSeleccionado.id,
+      nombreProveedor: proveedorSeleccionado.nombre,
+      referencia,
+      tallaCol,
+      tallaEur,
+      precio,
+      abono,
+      fechaEntrega,
+      foto,
+      observaciones,
+    };
+
+    setProductosAgregados([...productosAgregados, nuevoProducto]);
+
+    // Limpiar campos según requerimiento
+    setReferencia("");
+    setTallaCol("");
+    setTallaEur("");
+    setPrecio("");
+    setAbono("0");
+    setFoto(null);
+    setObservaciones("");
+    setMensaje("✅ Producto agregado a la lista");
+  };
+
+  const eliminarProductoLista = (id_temp: string) => {
+    setProductosAgregados(productosAgregados.filter((p) => p.id_temp !== id_temp));
+  };
+
   const crearEncargo = async () => {
     try {
       setCargando(true);
+
+      const tieneProductoActual = referencia.trim() !== "";
+      
+      if (productosAgregados.length === 0 && !tieneProductoActual) {
+        setMensaje("❌ Debes agregar al menos un producto o llenar los datos del encargo");
+        return;
+      }
+
       if (!nombreCliente.trim()) {
         setMensaje("❌ Debes escribir el nombre del cliente");
         return;
@@ -126,33 +203,23 @@ function CrearEncargo() {
         return;
       }
 
-      if (!proveedorSeleccionado) {
-        setMensaje("❌ Debes seleccionar o crear un proveedor");
-        return;
-      }
-
-      if (!referencia.trim()) {
-        setMensaje("❌ Debes escribir una referencia");
-        return;
-      }
-
-      if (!tallaCol.trim()) {
-        setMensaje("❌ Debes escribir talla COL");
-        return;
-      }
-
-      if (!tallaEur.trim()) {
-        setMensaje("❌ Debes escribir talla EUR");
-        return;
-      }
-
-      if (!precio || Number(precio) <= 0) {
-        setMensaje("❌ El precio debe ser mayor a 0");
-        return;
-      }
-      if (!proveedorSeleccionado) {
-        setMensaje("❌ Debes seleccionar o crear un proveedor");
-        return;
+      if (tieneProductoActual) {
+        if (!proveedorSeleccionado) {
+          setMensaje("❌ Debes seleccionar o crear un proveedor para el producto actual");
+          return;
+        }
+        if (!tallaCol.trim()) {
+          setMensaje("❌ Debes escribir talla COL para el producto actual");
+          return;
+        }
+        if (!tallaEur.trim()) {
+          setMensaje("❌ Debes escribir talla EUR para el producto actual");
+          return;
+        }
+        if (!precio || Number(precio) <= 0) {
+          setMensaje("❌ El precio debe ser mayor a 0 para el producto actual");
+          return;
+        }
       }
 
       let cliente = clienteSeleccionado;
@@ -174,41 +241,67 @@ function CrearEncargo() {
         await cargarClientes();
       }
 
-      let rutaFoto = null;
-
-      if (foto) {
-        setMensaje("⏳ Subiendo imagen...");
-        const imagenSubida = await subirImagenRequest(foto);
-
-        if (!imagenSubida.ruta) {
-          setMensaje("❌ Error al subir imagen");
-          return;
-        }
-
-        rutaFoto = imagenSubida.ruta;
+      const listaFinal: ProductoAgregado[] = [...productosAgregados];
+      if (tieneProductoActual && proveedorSeleccionado) {
+        listaFinal.push({
+          id_temp: "current",
+          proveedor_id: proveedorSeleccionado.id,
+          nombreProveedor: proveedorSeleccionado.nombre,
+          referencia,
+          tallaCol,
+          tallaEur,
+          precio,
+          abono,
+          fechaEntrega,
+          foto,
+          observaciones,
+        });
       }
 
-      setMensaje("⏳ Creando encargo...");
+      setMensaje(`⏳ Creando ${listaFinal.length} encargo(s)...`);
 
-      const data = {
-        cliente_id: cliente!.id,
-        proveedor_id: proveedorSeleccionado.id,
-        referencia,
-        talla_col: tallaCol,
-        talla_eur: tallaEur,
-        foto: rutaFoto,
-        precio: Number(precio),
-        abono: Number(abono),
-        fecha_entrega_estimada: fechaEntrega || null,
-        observaciones: observaciones || null,
-      };
+      let creados = 0;
+      let conErrores = 0;
+      let ultimoMensajeError = "";
 
-      const respuesta = await crearEncargoRequest(data);
+      for (const prod of listaFinal) {
+        let rutaFoto = null;
 
-      console.log("RESPUESTA BACKEND:", respuesta);
+        if (prod.foto) {
+          const imagenSubida = await subirImagenRequest(prod.foto);
+          if (imagenSubida.ruta) {
+            rutaFoto = imagenSubida.ruta;
+          }
+        }
 
-      if (respuesta.id) {
-        setMensaje("✅ Encargo creado correctamente");
+        const data = {
+          cliente_id: cliente!.id,
+          proveedor_id: prod.proveedor_id,
+          referencia: prod.referencia,
+          talla_col: prod.tallaCol,
+          talla_eur: prod.tallaEur,
+          foto: rutaFoto,
+          precio: Number(prod.precio),
+          abono: Number(prod.abono),
+          fecha_entrega_estimada: prod.fechaEntrega || null,
+          observaciones: prod.observaciones || null,
+        };
+
+        const respuesta = await crearEncargoRequest(data);
+
+        if (respuesta.id) {
+          creados++;
+        } else {
+          conErrores++;
+          if (respuesta.detail) {
+            ultimoMensajeError = Array.isArray(respuesta.detail) ? respuesta.detail[0].msg : respuesta.detail;
+          }
+          console.error("Error creando encargo:", respuesta);
+        }
+      }
+
+      if (creados > 0 && conErrores === 0) {
+        setMensaje(`✅ ${creados} encargo(s) creado(s) correctamente`);
 
         setReferencia("");
         setTallaCol("");
@@ -221,22 +314,18 @@ function CrearEncargo() {
         setNombreCliente("");
         setTelefonoCliente("");
         setClienteSeleccionado(null);
-
         setNombreProveedor("");
         setTelefonoProveedor("");
         setProveedorSeleccionado(null);
-      } else if (respuesta.detail) {
-        if (Array.isArray(respuesta.detail)) {
-          setMensaje(`❌ ${respuesta.detail[0].msg}`);
-        } else {
-          setMensaje(`❌ ${respuesta.detail}`);
-        }
+        setProductosAgregados([]);
+      } else if (creados > 0 && conErrores > 0) {
+        setMensaje(`⚠️ Se crearon ${creados} encargos, pero ${conErrores} fallaron. Último error: ${ultimoMensajeError}`);
       } else {
-        setMensaje("❌ Error al crear encargo");
+        setMensaje(`❌ Error al crear los encargos: ${ultimoMensajeError}`);
       }
     } catch (error) {
       console.error(error);
-      setMensaje("❌ Error de conexión");
+      setMensaje("❌ Error de conexión al crear encargos");
     } finally {
       setCargando(false);
     }
@@ -421,6 +510,7 @@ function CrearEncargo() {
             <input
               type="file"
               accept="image/*"
+              key={`foto-${productosAgregados.length}`}
               onChange={(e) => setFoto(e.target.files?.[0] || null)}
             />
           </div>
@@ -436,7 +526,17 @@ function CrearEncargo() {
           </div>
         </div>
 
-        <div className="botones">
+        <div className="botones botones-acciones-producto">
+          <button
+            className="btn btn-outline"
+            disabled={cargando}
+            onClick={agregarProductoLista}
+          >
+            Agregar otro producto
+          </button>
+        </div>
+
+        <div className="botones botones-proveedor">
           <button
             className="btn btn-secondary"
             disabled={cargando}
@@ -507,20 +607,52 @@ function CrearEncargo() {
               Guardar cambios proveedor
             </button>
           )}
-
-          <button
-            className="btn btn-primary"
-            disabled={cargando}
-            onClick={crearEncargo}
-          >
-            {cargando ? "Procesando..." : "Crear encargo"}
-          </button>
         </div>
       </div>
 
-      <p className="mensaje">{mensaje}</p>
+      {productosAgregados.length > 0 && (
+        <div className="seccion">
+          <h3>Productos a crear ({productosAgregados.length + (referencia.trim() ? 1 : 0)})</h3>
+          
+          <div className="lista-productos">
+            {productosAgregados.map((prod, index) => (
+              <div key={prod.id_temp} className="producto-item">
+                <div className="producto-info">
+                  <strong>{index + 1}. {prod.referencia}</strong> - Tallas: COL {prod.tallaCol} / EUR {prod.tallaEur} <br />
+                  <small>Proveedor: {prod.nombreProveedor} | Precio: ${prod.precio}</small>
+                </div>
+                <button
+                  className="btn btn-danger btn-eliminar-producto"
+                  onClick={() => eliminarProductoLista(prod.id_temp)}
+                  disabled={cargando}
+                >
+                  🗑
+                </button>
+              </div>
+            ))}
+            {referencia.trim() && (
+              <div className="producto-item producto-actual">
+                <div className="producto-info">
+                  <strong>+ {referencia} (En formulario)</strong> - Tallas: COL {tallaCol} / EUR {tallaEur} <br />
+                  <small>Se incluirá al guardar</small>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
-      <p>{mensaje}</p>
+      <div className="seccion seccion-final">
+        <button
+          className="btn btn-primary btn-crear-encargos"
+          disabled={cargando}
+          onClick={crearEncargo}
+        >
+          {cargando ? "Procesando..." : (productosAgregados.length > 0 ? "Crear todos los encargos" : "Crear encargo")}
+        </button>
+      </div>
+
+      <p className="mensaje">{mensaje}</p>
     </div>
   );
 }
