@@ -261,3 +261,22 @@ def enviar_template_encargo_en_local(
     print("WHATSAPP EN LOCAL:", response.json())
 
     return response.json()
+
+def enviar_mensaje_texto(numero: str, texto: str):
+    url = obtener_url_whatsapp()
+    headers = obtener_headers_whatsapp()
+    numero_formateado = normalizar_numero_whatsapp(numero)
+
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": numero_formateado,
+        "type": "text",
+        "text": {
+            "preview_url": False,
+            "body": texto
+        }
+    }
+
+    response = requests.post(url, headers=headers, json=payload, timeout=30)
+    return response.json()
