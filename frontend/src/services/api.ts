@@ -234,14 +234,18 @@ export const editarEncargoRequest = async (
   return res.json();
 };
 
-export const reenviarEncargoProveedorRequest = async (encargoId: number) => {
+export const reenviarEncargoProveedorRequest = async (encargoId: number, proveedorId?: number) => {
   const token = localStorage.getItem("token");
+
+  const body = proveedorId ? JSON.stringify({ proveedor_id: proveedorId }) : undefined;
 
   const res = await fetch(`${API_URL}/encargos/${encargoId}/reenviar-proveedor`, {
     method: "POST",
     headers: {
+      "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
+    body,
   });
 
   return res.json();

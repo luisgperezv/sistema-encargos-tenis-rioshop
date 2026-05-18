@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, String
 import shutil
@@ -263,9 +264,13 @@ def obtener_encargo(
 
     return encargo
 
+class ReenviarProveedorRequest(BaseModel):
+    proveedor_id: int | None = None
+
 @router.post("/encargos/{encargo_id}/reenviar-proveedor")
 def reenviar_encargo_proveedor(
     encargo_id: int,
+    request: ReenviarProveedorRequest | None = None,
     db: Session = Depends(get_db),
     current_user: str = Depends(get_current_user),
 ):
@@ -280,23 +285,31 @@ def reenviar_encargo_proveedor(
             detail="Este encargo ya no debería reenviarse al proveedor",
         )
 
-    if not encargo.proveedor:
+    proveedor_destino = None
+    if request and request.proveedor_id:
+        proveedor_destino = db.query(Proveedor).filter(Proveedor.id == request.proveedor_id).first()
+        if not proveedor_destino:
+            raise HTTPException(status_code=404, detail="El proveedor seleccionado no existe")
+    else:
+        proveedor_destino = encargo.proveedor
+
+    if not proveedor_destino:
         raise HTTPException(
             status_code=400,
-            detail="Este encargo no tiene proveedor asignado",
+            detail="Este encargo no tiene proveedor asignado ni se especificó uno para el reenvío",
         )
 
     try:
         if encargo.foto:
             respuesta = enviar_template_proveedor_foto(
-                numero=encargo.proveedor.telefono,
+                numero=proveedor_destino.telefono,
                 image_url=encargo.foto,
                 referencia=encargo.referencia,
                 talla_eur=encargo.talla_eur,
             )
         else:
             respuesta = enviar_template_proveedor_encargo(
-                numero=encargo.proveedor.telefono,
+                numero=proveedor_destino.telefono,
                 referencia=encargo.referencia,
                 talla_eur=encargo.talla_eur,
             )
@@ -312,7 +325,7 @@ def reenviar_encargo_proveedor(
         return {
             "mensaje": "Encargo reenviado al proveedor correctamente",
             "encargo_id": encargo.id,
-            "proveedor": encargo.proveedor.nombre,
+            "proveedor": proveedor_destino.nombre,
             "respuesta_whatsapp": respuesta,
         }
 

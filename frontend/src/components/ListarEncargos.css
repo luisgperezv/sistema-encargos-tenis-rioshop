@@ -418,3 +418,34 @@
   background: #e5e7eb !important;
   color: #374151 !important;
 }
+
+.reenvio-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  grid-column: 1 / -1;
+  background-color: rgba(255, 255, 255, 0.7);
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  margin-top: 10px;
+}
+
+.reenvio-container select {
+  width: 100%;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  padding: 0 12px;
+  background: white;
+  font-weight: 700;
+}
+
+.reenvio-acciones {
+  display: flex;
+  gap: 8px;
+}
+
+.reenvio-acciones button {
+  flex: 1;
+}
