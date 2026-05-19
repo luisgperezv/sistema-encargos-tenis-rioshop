@@ -462,6 +462,12 @@ function ListarEncargos() {
               <div className="info-grid">
                 <p>
                   <strong>Cliente:</strong> {encargo.cliente?.nombre}
+                  {encargo.cliente?.telefono && (
+                    <>
+                      {" "}
+                      — <strong>WhatsApp:</strong> {encargo.cliente.telefono}
+                    </>
+                  )}
                 </p>
 
                 <p>
