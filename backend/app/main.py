@@ -88,20 +88,37 @@ async def recibir_webhook(request: Request):
                                     emisor = message.get("from")
                                     
                                     if emisor:
-                                        proveedor = db.query(Proveedor).filter(Proveedor.telefono == emisor).first()
-                                        if proveedor:
+                                        from app.services.whatsapp import normalizar_numero_whatsapp
+                                        emisor_normalizado = normalizar_numero_whatsapp(emisor)
+                                        print(f"[WEBHOOK] Recibido de: {emisor} | Normalizado: {emisor_normalizado}")
+                                        
+                                        proveedores = db.query(Proveedor).all()
+                                        proveedor_encontrado = None
+                                        for p in proveedores:
+                                            if normalizar_numero_whatsapp(p.telefono) == emisor_normalizado:
+                                                proveedor_encontrado = p
+                                                break
+                                                
+                                        if proveedor_encontrado:
+                                            print(f"[WEBHOOK] Proveedor encontrado: ID {proveedor_encontrado.id} - {proveedor_encontrado.nombre}")
                                             msg_type = message.get("type", "unknown")
                                             contenido = ""
                                             if msg_type == "text":
                                                 contenido = message.get("text", {}).get("body", "")
+                                            else:
+                                                contenido_obj = message.get(msg_type, {})
+                                                if isinstance(contenido_obj, dict) and "caption" in contenido_obj:
+                                                    contenido = contenido_obj.get("caption", "")
+                                                else:
+                                                    contenido = f"[Mensaje {msg_type}]"
                                             
                                             contactos = value.get("contacts", [])
                                             nombre_perfil = contactos[0].get("profile", {}).get("name") if contactos else None
                                             whatsapp_msg_id = message.get("id")
                                             
                                             nuevo_mensaje = MensajeProveedor(
-                                                proveedor_id=proveedor.id,
-                                                telefono=emisor,
+                                                proveedor_id=proveedor_encontrado.id,
+                                                telefono=proveedor_encontrado.telefono, # Guardar el teléfono como está en la DB
                                                 nombre_perfil=nombre_perfil,
                                                 direccion="entrante",
                                                 tipo=msg_type,
@@ -111,8 +128,9 @@ async def recibir_webhook(request: Request):
                                             )
                                             db.add(nuevo_mensaje)
                                             db.commit()
-                                            print(f"Mensaje de proveedor {emisor} guardado.")
+                                            print(f"[WEBHOOK] Mensaje de proveedor {proveedor_encontrado.telefono} guardado.")
                                         else:
+                                            print(f"[WEBHOOK] No se encontró proveedor para {emisor_normalizado}. Enviando auto-respuesta.")
                                             texto_respuesta = (
                                                 "Hola 👋 Gracias por escribirnos.\n\n"
                                                 "Este número se usa únicamente para notificaciones automáticas de tus encargos.\n\n"

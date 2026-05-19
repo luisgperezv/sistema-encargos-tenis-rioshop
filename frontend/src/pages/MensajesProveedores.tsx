@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   listarConversacionesProveedoresRequest,
   obtenerMensajesProveedorRequest,
@@ -7,6 +8,7 @@ import {
 import "./MensajesProveedores.css";
 
 function MensajesProveedores() {
+  const navigate = useNavigate();
   const [conversaciones, setConversaciones] = useState<any[]>([]);
   const [telefonoActivo, setTelefonoActivo] = useState<string | null>(null);
   const [proveedorActivoNombre, setProveedorActivoNombre] = useState<string>("");
@@ -125,8 +127,14 @@ function MensajesProveedores() {
     <div className="mensajes-container">
       {/* Sidebar: Lista de conversaciones */}
       <div className="conversaciones-sidebar">
-        <div className="conversaciones-header">
+        <div className="conversaciones-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h2>Proveedores</h2>
+          <button 
+            onClick={() => navigate("/dashboard")}
+            style={{ padding: "6px 12px", border: "1px solid #d1d5db", borderRadius: "6px", backgroundColor: "#ffffff", cursor: "pointer", fontSize: "0.875rem", fontWeight: "500", color: "#374151" }}
+          >
+            Volver
+          </button>
         </div>
         <div className="conversaciones-lista">
           {conversaciones.map((conv) => (
