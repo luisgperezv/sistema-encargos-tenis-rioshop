@@ -45,6 +45,15 @@ function Header() {
         >
           Ver encargos
         </NavLink>
+
+        <NavLink
+          to="/dashboard/mensajes"
+          className={({ isActive }) =>
+            isActive ? "nav-link nav-link-active" : "nav-link"
+          }
+        >
+          Mensajes proveedores
+        </NavLink>
       </nav>
     </>
   );

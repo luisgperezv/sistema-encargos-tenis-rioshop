@@ -5,6 +5,7 @@ import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import NuevoEncargoPage from "./pages/NuevoEncargoPage";
 import EncargosPage from "./pages/EncargosPage";
+import MensajesProveedores from "./pages/MensajesProveedores";
 
 import "./App.css";
 
@@ -55,6 +56,17 @@ function App() {
           element={
             logueado ? (
               <EncargosPage />
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+
+        <Route
+          path="/dashboard/mensajes"
+          element={
+            logueado ? (
+              <MensajesProveedores />
             ) : (
               <Navigate to="/login" />
             )

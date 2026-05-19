@@ -250,3 +250,44 @@ export const reenviarEncargoProveedorRequest = async (encargoId: number, proveed
 
   return res.json();
 };
+
+export const listarConversacionesProveedoresRequest = async () => {
+  const token = localStorage.getItem("token");
+
+  const res = await fetch(`${API_URL}/mensajes-proveedores/conversaciones`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return res.json();
+};
+
+export const obtenerMensajesProveedorRequest = async (telefono: string) => {
+  const token = localStorage.getItem("token");
+
+  const res = await fetch(`${API_URL}/mensajes-proveedores/${telefono}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return res.json();
+};
+
+export const enviarMensajeProveedorRequest = async (telefono: string, contenido: string) => {
+  const token = localStorage.getItem("token");
+
+  const res = await fetch(`${API_URL}/mensajes-proveedores/enviar`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ telefono, contenido }),
+  });
+
+  return res.json();
+};
