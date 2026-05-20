@@ -16,6 +16,10 @@ class MensajeProveedor(Base):
     contenido = Column(Text, nullable=True)
     media_url = Column(String, nullable=True)
     whatsapp_message_id = Column(String, unique=True, nullable=True)
+    reply_to_whatsapp_message_id = Column(String, nullable=True)
+    reply_to_text = Column(Text, nullable=True)
+    reply_to_media_url = Column(String, nullable=True)
     fecha_creacion = Column(DateTime, default=datetime.utcnow)
+
 
     proveedor = relationship("Proveedor")

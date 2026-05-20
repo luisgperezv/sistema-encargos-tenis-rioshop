@@ -218,3 +218,72 @@
     height: 70%;
   }
 }
+
+/* WhatsApp-like message replies */
+.mensaje-reply-container {
+  display: flex;
+  background-color: rgba(0, 0, 0, 0.05);
+  border-left: 4px solid #128c7e;
+  border-radius: 4px;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  font-size: 0.8rem;
+  max-width: 100%;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.mensaje-reply-container:hover {
+  background-color: rgba(0, 0, 0, 0.08);
+}
+
+.mensaje.saliente .mensaje-reply-container {
+  background-color: rgba(0, 0, 0, 0.04);
+  border-left-color: #075e54;
+}
+
+.mensaje.saliente .mensaje-reply-container:hover {
+  background-color: rgba(0, 0, 0, 0.07);
+}
+
+.mensaje-reply-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.mensaje-reply-title {
+  font-weight: bold;
+  color: #128c7e;
+  font-size: 0.75rem;
+  margin-bottom: 2px;
+  text-align: left;
+}
+
+.mensaje.saliente .mensaje-reply-title {
+  color: #075e54;
+}
+
+.mensaje-reply-text {
+  color: #4b5563;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+
+.mensaje-reply-image {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex-shrink: 0;
+  order: 2;
+  transition: transform 0.2s;
+}
+
+.mensaje-reply-image:hover {
+  transform: scale(1.05);
+}
+

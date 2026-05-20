@@ -20,8 +20,8 @@ Base.metadata.create_all(bind=engine)
 
 def ejecutar_migraciones_ligeras():
     """
-    Agrega de manera segura y defensiva la columna media_url a mensajes_proveedores
-    si no existe. No bloquea el arranque del servidor si ocurre algún error.
+    Agrega de manera segura y defensiva las nuevas columnas a la tabla mensajes_proveedores
+    si no existen. No bloquea el arranque del servidor si ocurre algún error.
     """
     from sqlalchemy import text
     from app.database import SessionLocal
@@ -29,24 +29,32 @@ def ejecutar_migraciones_ligeras():
     
     print("[MIGRACIÓN] Iniciando verificación de base de datos...", flush=True)
     db = SessionLocal()
-    try:
-        db.execute(text("SELECT media_url FROM mensajes_proveedores LIMIT 1"))
-        print("[MIGRACIÓN] La columna media_url ya existe en la tabla mensajes_proveedores.", flush=True)
-    except Exception:
-        db.rollback()
-        print("[MIGRACIÓN] La columna media_url no existe. Intentando agregarla...", flush=True)
+    
+    columnas_nuevas = {
+        "media_url": "VARCHAR",
+        "reply_to_whatsapp_message_id": "VARCHAR",
+        "reply_to_text": "TEXT",
+        "reply_to_media_url": "VARCHAR"
+    }
+    
+    for col, col_type in columnas_nuevas.items():
         try:
-            db.execute(text("ALTER TABLE mensajes_proveedores ADD COLUMN media_url VARCHAR"))
-            db.commit()
-            print("[MIGRACIÓN] Columna media_url añadida exitosamente.", flush=True)
-        except Exception as alter_err:
+            db.execute(text(f"SELECT {col} FROM mensajes_proveedores LIMIT 1"))
+            print(f"[MIGRACIÓN] La columna {col} ya existe en la tabla mensajes_proveedores.", flush=True)
+        except Exception:
             db.rollback()
-            logging.warning(
-                f"[MIGRACIÓN WARNING] No se pudo agregar la columna media_url automáticamente: {str(alter_err)}. "
-                "Es posible que deba agregarse manualmente."
-            )
-    finally:
-        db.close()
+            print(f"[MIGRACIÓN] La columna {col} no existe. Intentando agregarla...", flush=True)
+            try:
+                db.execute(text(f"ALTER TABLE mensajes_proveedores ADD COLUMN {col} {col_type}"))
+                db.commit()
+                print(f"[MIGRACIÓN] Columna {col} añadida exitosamente.", flush=True)
+            except Exception as alter_err:
+                db.rollback()
+                logging.warning(
+                    f"[MIGRACIÓN WARNING] No se pudo agregar la columna {col} automáticamente: {str(alter_err)}. "
+                    "Es posible que deba agregarse manualmente."
+                )
+    db.close()
 
 
 ejecutar_migraciones_ligeras()
@@ -160,6 +168,25 @@ async def recibir_webhook(request: Request):
                                             nombre_perfil = contactos[0].get("profile", {}).get("name") if contactos else None
                                             whatsapp_msg_id = message.get("id")
                                             
+                                            context_id = message.get("context", {}).get("id")
+                                            reply_to_whatsapp_message_id = None
+                                            reply_to_text = None
+                                            reply_to_media_url = None
+                                            
+                                            if context_id:
+                                                print(f"[WEBHOOK] Mensaje entrante tiene reply context: {context_id}")
+                                                original_msg = db.query(MensajeProveedor).filter(
+                                                    MensajeProveedor.whatsapp_message_id == context_id
+                                                ).first()
+                                                if original_msg:
+                                                    print(f"[WEBHOOK] Mensaje original encontrado: {original_msg.id}")
+                                                    reply_to_whatsapp_message_id = context_id
+                                                    reply_to_text = original_msg.contenido
+                                                    reply_to_media_url = original_msg.media_url
+                                                else:
+                                                    print(f"[WEBHOOK] Mensaje original NO encontrado para context_id {context_id}")
+                                                    reply_to_whatsapp_message_id = context_id
+                                            
                                             nuevo_mensaje = MensajeProveedor(
                                                 proveedor_id=proveedor_encontrado.id,
                                                 telefono=proveedor_encontrado.telefono, # Guardar el teléfono como está en la DB
@@ -169,6 +196,9 @@ async def recibir_webhook(request: Request):
                                                 contenido=contenido,
                                                 media_url=media_url,
                                                 whatsapp_message_id=whatsapp_msg_id,
+                                                reply_to_whatsapp_message_id=reply_to_whatsapp_message_id,
+                                                reply_to_text=reply_to_text,
+                                                reply_to_media_url=reply_to_media_url,
                                                 fecha_creacion=datetime.utcnow()
                                             )
                                             db.add(nuevo_mensaje)

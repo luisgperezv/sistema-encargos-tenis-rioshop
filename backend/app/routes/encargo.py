@@ -31,6 +31,7 @@ from app.database import get_db
 from app.models.encargo import Encargo
 from app.models.cliente import Cliente
 from app.models.proveedor import Proveedor
+from app.models.mensaje_proveedor import MensajeProveedor
 from app.schemas.encargo import (
     EncargoCreate,
     EncargoResponse,
@@ -220,6 +221,23 @@ def crear_encargo(
 
             print("WHATSAPP PROVEEDOR:", respuesta_whatsapp_proveedor)
 
+            # Persistir mensaje automático enviado en base de datos
+            if respuesta_whatsapp_proveedor and "messages" in respuesta_whatsapp_proveedor and len(respuesta_whatsapp_proveedor["messages"]) > 0:
+                wamid = respuesta_whatsapp_proveedor["messages"][0]["id"]
+                nuevo_msg = MensajeProveedor(
+                    proveedor_id=proveedor.id,
+                    telefono=proveedor.telefono,
+                    nombre_perfil=None,
+                    direccion="saliente",
+                    tipo="image" if image_url else "text",
+                    contenido=f"Talla EUR: {nuevo_encargo.talla_eur}",
+                    media_url=image_url,
+                    whatsapp_message_id=wamid
+                )
+                db.add(nuevo_msg)
+                db.commit()
+                print(f"[AUTO_MSG] Mensaje saliente automatico persistido en BD. wamid: {wamid}", flush=True)
+
         except Exception as e:
             print("Error enviando template al proveedor:", e)
 
@@ -321,6 +339,23 @@ def reenviar_encargo_proveedor(
                 status_code=400,
                 detail=respuesta["error"].get("message", "Error enviando WhatsApp"),
             )
+
+        # Persistir mensaje automático enviado en base de datos
+        if respuesta and "messages" in respuesta and len(respuesta["messages"]) > 0:
+            wamid = respuesta["messages"][0]["id"]
+            nuevo_msg = MensajeProveedor(
+                proveedor_id=proveedor_destino.id,
+                telefono=proveedor_destino.telefono,
+                nombre_perfil=None,
+                direccion="saliente",
+                tipo="image" if encargo.foto else "text",
+                contenido=f"Talla EUR: {encargo.talla_eur}",
+                media_url=encargo.foto,
+                whatsapp_message_id=wamid
+            )
+            db.add(nuevo_msg)
+            db.commit()
+            print(f"[AUTO_MSG_REENVIO] Mensaje saliente automatico reenviado persistido en BD. wamid: {wamid}", flush=True)
 
         return {
             "mensaje": "Encargo reenviado al proveedor correctamente",

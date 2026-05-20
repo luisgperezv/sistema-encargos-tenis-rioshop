@@ -225,6 +225,26 @@ function MensajesProveedores() {
                     )}
                     <div className={`mensaje ${msg.direccion}`}>
                       <div className="mensaje-contenido">
+                        {/* Reply context box — WhatsApp style */}
+                        {(msg.reply_to_text || msg.reply_to_media_url) && (
+                          <div className="mensaje-reply-container">
+                            <div className="mensaje-reply-content">
+                              <div className="mensaje-reply-title">Mensaje original</div>
+                              <div className="mensaje-reply-text">
+                                {msg.reply_to_text || "Imagen"}
+                              </div>
+                            </div>
+                            {msg.reply_to_media_url && (
+                              <img
+                                className="mensaje-reply-image"
+                                src={msg.reply_to_media_url}
+                                alt="Producto original"
+                                onClick={() => window.open(msg.reply_to_media_url, "_blank")}
+                                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                              />
+                            )}
+                          </div>
+                        )}
                         {msg.media_url && <ChatImage src={msg.media_url} />}
                         {msg.contenido && msg.contenido !== "[Mensaje image]" && (
                           <div style={{ wordBreak: "break-word" }}>{msg.contenido}</div>

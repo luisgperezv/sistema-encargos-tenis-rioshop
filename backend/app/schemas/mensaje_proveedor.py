@@ -11,6 +11,10 @@ class MensajeProveedorBase(BaseModel):
     contenido: Optional[str] = None
     media_url: Optional[str] = None
     whatsapp_message_id: Optional[str] = None
+    reply_to_whatsapp_message_id: Optional[str] = None
+    reply_to_text: Optional[str] = None
+    reply_to_media_url: Optional[str] = None
+
 
 
 class MensajeProveedorCreate(MensajeProveedorBase):
