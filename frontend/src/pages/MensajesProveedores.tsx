@@ -12,7 +12,7 @@ function ChatImage({ src }: { src: string }) {
 
   if (hasError) {
     return (
-      <div className="mensaje-imagen-fallback" style={{ padding: "8px", backgroundColor: "#fee2e2", color: "#991b1b", borderRadius: "8px", fontSize: "0.875rem", display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
+      <div className="mensaje-imagen-fallback">
         <span>⚠️ Imagen no disponible</span>
       </div>
     );
@@ -22,7 +22,7 @@ function ChatImage({ src }: { src: string }) {
     <img 
       src={src} 
       alt="Adjunto" 
-      style={{ maxWidth: "100%", maxHeight: "250px", borderRadius: "8px", cursor: "pointer", display: "block", marginBottom: "6px" }} 
+      className="chat-image-preview"
       onError={() => setHasError(true)} 
       onClick={() => window.open(src, "_blank")}
     />
@@ -30,7 +30,6 @@ function ChatImage({ src }: { src: string }) {
 }
 
 function MensajesProveedores() {
-
   const navigate = useNavigate();
   const [conversaciones, setConversaciones] = useState<any[]>([]);
   const [telefonoActivo, setTelefonoActivo] = useState<string | null>(null);
@@ -38,11 +37,11 @@ function MensajesProveedores() {
   const [mensajes, setMensajes] = useState<any[]>([]);
   const [nuevoMensaje, setNuevoMensaje] = useState("");
   const [enviando, setEnviando] = useState(false);
+  const [showMobileChat, setShowMobileChat] = useState(false);
   const mensajesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     cargarConversaciones();
-    // Opcional: configurar un intervalo para actualizar (polling) si fuera necesario.
   }, []);
 
   useEffect(() => {
@@ -80,6 +79,11 @@ function MensajesProveedores() {
   const seleccionarConversacion = (telefono: string, nombre: string) => {
     setTelefonoActivo(telefono);
     setProveedorActivoNombre(nombre);
+    setShowMobileChat(true);
+  };
+
+  const handleBackToList = () => {
+    setShowMobileChat(false);
   };
 
   const enviarMensaje = async () => {
@@ -91,7 +95,6 @@ function MensajesProveedores() {
       if (data && data.id) {
         setMensajes((prev) => [...prev, data]);
         setNuevoMensaje("");
-        // Actualizar la lista de conversaciones para reflejar el último mensaje enviado
         cargarConversaciones();
       } else {
         alert(data?.detail || "Error al enviar mensaje");
@@ -114,17 +117,20 @@ function MensajesProveedores() {
     }
   };
 
-  // Lógica para validar la ventana de 24 horas
+  const getInitials = (name: string) => {
+    if (!name) return "?";
+    return name.substring(0, 2).toUpperCase();
+  };
+
   let ventanaExpirada = true;
   let noHayMensajesEntrantes = true;
 
   if (mensajes.length > 0) {
-    // Buscar el último mensaje entrante
     const mensajesEntrantes = mensajes.filter((m) => m.direccion === "entrante");
     if (mensajesEntrantes.length > 0) {
       noHayMensajesEntrantes = false;
       const ultimoEntrante = mensajesEntrantes[mensajesEntrantes.length - 1];
-      const fechaUltimo = new Date(ultimoEntrante.fecha_creacion + "Z"); // Asegurar UTC
+      const fechaUltimo = new Date(ultimoEntrante.fecha_creacion + "Z");
       const ahora = new Date();
       
       const difMilisegundos = ahora.getTime() - fechaUltimo.getTime();
@@ -147,15 +153,12 @@ function MensajesProveedores() {
   };
 
   return (
-    <div className="mensajes-container">
+    <div className={`mensajes-container ${showMobileChat ? "mobile-chat-active" : ""}`}>
       {/* Sidebar: Lista de conversaciones */}
       <div className="conversaciones-sidebar">
-        <div className="conversaciones-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h2>Proveedores</h2>
-          <button 
-            onClick={() => navigate("/dashboard")}
-            style={{ padding: "6px 12px", border: "1px solid #d1d5db", borderRadius: "6px", backgroundColor: "#ffffff", cursor: "pointer", fontSize: "0.875rem", fontWeight: "500", color: "#374151" }}
-          >
+        <div className="conversaciones-header">
+          <h2>Mensajes</h2>
+          <button className="btn-volver-dashboard" onClick={() => navigate("/dashboard")}>
             Volver
           </button>
         </div>
@@ -166,27 +169,32 @@ function MensajesProveedores() {
               className={`conversacion-item ${telefonoActivo === conv.telefono ? "activa" : ""}`}
               onClick={() => seleccionarConversacion(conv.telefono, conv.nombre)}
             >
-              <div className="conversacion-nombre">{conv.nombre}</div>
-              <div className="conversacion-telefono">{conv.telefono}</div>
-              {conv.ultimo_mensaje && (
-                <div className="conversacion-ultimo-mensaje">
-                  {conv.ultimo_mensaje.direccion === "saliente" ? "Tú: " : ""}
-                  {conv.ultimo_mensaje.tipo === "text" ? conv.ultimo_mensaje.contenido : `[${conv.ultimo_mensaje.tipo}]`}
-                  {" • "}
-                  {formatDate(conv.fecha_ultimo_mensaje)}
+              <div className="conversacion-avatar">
+                {getInitials(conv.nombre)}
+              </div>
+              <div className="conversacion-info">
+                <div className="conversacion-top-row">
+                  <span className="conversacion-nombre">{conv.nombre}</span>
+                  {conv.ultimo_mensaje && (
+                    <span className="conversacion-fecha">{formatDate(conv.fecha_ultimo_mensaje)}</span>
+                  )}
                 </div>
-              )}
-              {!conv.ultimo_mensaje && (
+                <div className="conversacion-telefono">{conv.telefono}</div>
                 <div className="conversacion-ultimo-mensaje">
-                  Sin mensajes recientes
+                  {conv.ultimo_mensaje ? (
+                    <>
+                      {conv.ultimo_mensaje.direccion === "saliente" && <span className="msg-tu">Tú: </span>}
+                      {conv.ultimo_mensaje.tipo === "text" ? conv.ultimo_mensaje.contenido : `[${conv.ultimo_mensaje.tipo}]`}
+                    </>
+                  ) : (
+                    "Sin mensajes recientes"
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           ))}
           {conversaciones.length === 0 && (
-            <div style={{ padding: "20px", textAlign: "center", color: "#6b7280" }}>
-              No hay proveedores registrados.
-            </div>
+            <div className="empty-state">No hay proveedores registrados.</div>
           )}
         </div>
       </div>
@@ -195,10 +203,18 @@ function MensajesProveedores() {
       {telefonoActivo ? (
         <div className="chat-area">
           <div className="chat-header">
-            <h2>{proveedorActivoNombre}</h2>
+            <button className="btn-mobile-back" onClick={handleBackToList}>
+              ←
+            </button>
+            <div className="chat-header-avatar">
+              {getInitials(proveedorActivoNombre)}
+            </div>
+            <div className="chat-header-info">
+              <h2>{proveedorActivoNombre}</h2>
+              <span>{telefonoActivo}</span>
+            </div>
           </div>
 
-          {/* Mostrar alerta si la ventana expiró o no hay mensajes entrantes */}
           {(ventanaExpirada || noHayMensajesEntrantes) && (
             <div className="alerta-expirada">
               {noHayMensajesEntrantes 
@@ -209,23 +225,20 @@ function MensajesProveedores() {
 
           <div className="chat-mensajes">
             {mensajes.length === 0 ? (
-              <div style={{ textAlign: "center", color: "#6b7280", marginTop: "20px" }}>
-                No hay mensajes con este proveedor.
-              </div>
+              <div className="empty-state">No hay mensajes con este proveedor.</div>
             ) : (
               mensajes.map((msg, index) => {
                 const mostrarFecha = index === 0 || formatDate(mensajes[index - 1].fecha_creacion) !== formatDate(msg.fecha_creacion);
                 
                 return (
-                  <div key={msg.id} style={{ display: 'flex', flexDirection: 'column' }}>
+                  <div key={msg.id} className="mensaje-wrapper">
                     {mostrarFecha && (
-                      <div style={{ textAlign: 'center', margin: '10px 0', fontSize: '0.8rem', color: '#6b7280' }}>
-                        {formatDate(msg.fecha_creacion)}
+                      <div className="mensaje-fecha-separador">
+                        <span>{formatDate(msg.fecha_creacion)}</span>
                       </div>
                     )}
                     <div className={`mensaje ${msg.direccion}`}>
                       <div className="mensaje-contenido">
-                        {/* Reply context box — WhatsApp style */}
                         {(msg.reply_to_text || msg.reply_to_media_url) && (
                           <div className="mensaje-reply-container">
                             <div className="mensaje-reply-content">
@@ -247,20 +260,18 @@ function MensajesProveedores() {
                         )}
                         {msg.media_url && <ChatImage src={msg.media_url} />}
                         {msg.contenido && msg.contenido !== "[Mensaje image]" && (
-                          <div style={{ wordBreak: "break-word" }}>{msg.contenido}</div>
+                          <div className="mensaje-texto">{msg.contenido}</div>
                         )}
                         {(!msg.contenido || msg.contenido === "[Mensaje image]") && !msg.media_url && (
-                          <div>{`[Mensaje tipo: ${msg.tipo}]`}</div>
+                          <div className="mensaje-texto">{`[Mensaje tipo: ${msg.tipo}]`}</div>
                         )}
                       </div>
-                      <span className="mensaje-fecha">{formatHora(msg.fecha_creacion)}</span>
+                      <span className="mensaje-hora">{formatHora(msg.fecha_creacion)}</span>
                     </div>
                   </div>
-
                 );
               })
             )}
-
             <div ref={mensajesEndRef} />
           </div>
 
@@ -285,7 +296,11 @@ function MensajesProveedores() {
         </div>
       ) : (
         <div className="no-chat-seleccionado">
-          Selecciona un proveedor para ver los mensajes
+          <div className="no-chat-content">
+            <div className="no-chat-icon">💬</div>
+            <h3>Selecciona un chat</h3>
+            <p>Elige un proveedor de la lista para ver los mensajes</p>
+          </div>
         </div>
       )}
     </div>
