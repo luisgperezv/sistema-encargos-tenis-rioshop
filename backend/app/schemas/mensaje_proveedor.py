@@ -9,6 +9,7 @@ class MensajeProveedorBase(BaseModel):
     direccion: str
     tipo: str
     contenido: Optional[str] = None
+    media_url: Optional[str] = None
     whatsapp_message_id: Optional[str] = None
 
 

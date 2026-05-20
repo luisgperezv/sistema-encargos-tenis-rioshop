@@ -14,6 +14,7 @@ class MensajeProveedor(Base):
     direccion = Column(String, nullable=False)  # "entrante" o "saliente"
     tipo = Column(String, nullable=False, default="text")  # "text", "image", "audio", "document", "unknown"
     contenido = Column(Text, nullable=True)
+    media_url = Column(String, nullable=True)
     whatsapp_message_id = Column(String, unique=True, nullable=True)
     fecha_creacion = Column(DateTime, default=datetime.utcnow)
 

@@ -7,7 +7,30 @@ import {
 } from "../services/api";
 import "./MensajesProveedores.css";
 
+function ChatImage({ src }: { src: string }) {
+  const [hasError, setHasError] = useState(false);
+
+  if (hasError) {
+    return (
+      <div className="mensaje-imagen-fallback" style={{ padding: "8px", backgroundColor: "#fee2e2", color: "#991b1b", borderRadius: "8px", fontSize: "0.875rem", display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
+        <span>⚠️ Imagen no disponible</span>
+      </div>
+    );
+  }
+
+  return (
+    <img 
+      src={src} 
+      alt="Adjunto" 
+      style={{ maxWidth: "100%", maxHeight: "250px", borderRadius: "8px", cursor: "pointer", display: "block", marginBottom: "6px" }} 
+      onError={() => setHasError(true)} 
+      onClick={() => window.open(src, "_blank")}
+    />
+  );
+}
+
 function MensajesProveedores() {
+
   const navigate = useNavigate();
   const [conversaciones, setConversaciones] = useState<any[]>([]);
   const [telefonoActivo, setTelefonoActivo] = useState<string | null>(null);
@@ -202,14 +225,22 @@ function MensajesProveedores() {
                     )}
                     <div className={`mensaje ${msg.direccion}`}>
                       <div className="mensaje-contenido">
-                        {msg.tipo === "text" ? msg.contenido : `[Mensaje tipo: ${msg.tipo}]`}
+                        {msg.media_url && <ChatImage src={msg.media_url} />}
+                        {msg.contenido && msg.contenido !== "[Mensaje image]" && (
+                          <div style={{ wordBreak: "break-word" }}>{msg.contenido}</div>
+                        )}
+                        {(!msg.contenido || msg.contenido === "[Mensaje image]") && !msg.media_url && (
+                          <div>{`[Mensaje tipo: ${msg.tipo}]`}</div>
+                        )}
                       </div>
                       <span className="mensaje-fecha">{formatHora(msg.fecha_creacion)}</span>
                     </div>
                   </div>
+
                 );
               })
             )}
+
             <div ref={mensajesEndRef} />
           </div>
 

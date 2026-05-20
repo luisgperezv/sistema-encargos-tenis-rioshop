@@ -18,6 +18,40 @@ import os
 
 Base.metadata.create_all(bind=engine)
 
+def ejecutar_migraciones_ligeras():
+    """
+    Agrega de manera segura y defensiva la columna media_url a mensajes_proveedores
+    si no existe. No bloquea el arranque del servidor si ocurre algún error.
+    """
+    from sqlalchemy import text
+    from app.database import SessionLocal
+    import logging
+    
+    print("[MIGRACIÓN] Iniciando verificación de base de datos...", flush=True)
+    db = SessionLocal()
+    try:
+        db.execute(text("SELECT media_url FROM mensajes_proveedores LIMIT 1"))
+        print("[MIGRACIÓN] La columna media_url ya existe en la tabla mensajes_proveedores.", flush=True)
+    except Exception:
+        db.rollback()
+        print("[MIGRACIÓN] La columna media_url no existe. Intentando agregarla...", flush=True)
+        try:
+            db.execute(text("ALTER TABLE mensajes_proveedores ADD COLUMN media_url VARCHAR"))
+            db.commit()
+            print("[MIGRACIÓN] Columna media_url añadida exitosamente.", flush=True)
+        except Exception as alter_err:
+            db.rollback()
+            logging.warning(
+                f"[MIGRACIÓN WARNING] No se pudo agregar la columna media_url automáticamente: {str(alter_err)}. "
+                "Es posible que deba agregarse manualmente."
+            )
+    finally:
+        db.close()
+
+
+ejecutar_migraciones_ligeras()
+
+
 app = FastAPI(title="Sistema de Encargos Tenis Rio Shop")
 app.add_middleware(
     CORSMiddleware,
@@ -103,6 +137,8 @@ async def recibir_webhook(request: Request):
                                             print(f"[WEBHOOK] Proveedor encontrado: ID {proveedor_encontrado.id} - {proveedor_encontrado.nombre}")
                                             msg_type = message.get("type", "unknown")
                                             contenido = ""
+                                            media_url = None
+                                            
                                             if msg_type == "text":
                                                 contenido = message.get("text", {}).get("body", "")
                                             else:
@@ -111,6 +147,14 @@ async def recibir_webhook(request: Request):
                                                     contenido = contenido_obj.get("caption", "")
                                                 else:
                                                     contenido = f"[Mensaje {msg_type}]"
+                                                
+                                                # Si es de tipo imagen, intentamos descargarla y subirla a Cloudinary
+                                                if msg_type == "image" and isinstance(contenido_obj, dict) and "id" in contenido_obj:
+                                                    from app.services.whatsapp import descargar_y_subir_media_whatsapp
+                                                    media_id = contenido_obj["id"]
+                                                    media_url = descargar_y_subir_media_whatsapp(media_id)
+                                                    if not media_url:
+                                                        contenido = "[Imagen recibida, pero no se pudo descargar]"
                                             
                                             contactos = value.get("contacts", [])
                                             nombre_perfil = contactos[0].get("profile", {}).get("name") if contactos else None
@@ -123,6 +167,7 @@ async def recibir_webhook(request: Request):
                                                 direccion="entrante",
                                                 tipo=msg_type,
                                                 contenido=contenido,
+                                                media_url=media_url,
                                                 whatsapp_message_id=whatsapp_msg_id,
                                                 fecha_creacion=datetime.utcnow()
                                             )
