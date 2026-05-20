@@ -1,16 +1,15 @@
-import Header from "../components/Header";
+import Layout from "../components/Layout";
 import CrearEncargo from "../components/CrearEncargo";
 import ListarEncargos from "../components/ListarEncargos";
 
 function DashboardPage() {
   return (
-    <div className="app-panel">
-      <Header />
-
-      <CrearEncargo />
-
-      <ListarEncargos />
-    </div>
+    <Layout>
+      <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
+        <CrearEncargo />
+        <ListarEncargos />
+      </div>
+    </Layout>
   );
 }
 

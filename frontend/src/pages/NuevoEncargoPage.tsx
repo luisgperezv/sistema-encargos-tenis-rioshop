@@ -1,12 +1,11 @@
-import Header from "../components/Header";
+import Layout from "../components/Layout";
 import CrearEncargo from "../components/CrearEncargo";
 
 function NuevoEncargoPage() {
   return (
-    <div className="app-panel">
-      <Header />
+    <Layout>
       <CrearEncargo />
-    </div>
+    </Layout>
   );
 }
 

@@ -12,14 +12,11 @@ import {
 import "./ListarEncargos.css";
 
 const colorEstado = (estado: string) => {
-  if (estado === "pendiente") return "#fecaca";
-  if (estado === "pedido") return "#dbeafe";
-  if (estado === "despachado") return "rgb(237, 220, 93)";
-  if (estado === "en_local") return "#fed7aa";
-  if (estado === "entregado") return "#09f35b";
-  if (estado === "cancelado") return "#e5e7eb";
-
-  return "#ffffff";
+  if (estado === "pendiente") return "rgba(239, 68, 68, 0.05)";
+  if (estado === "pedido" || estado === "despachado" || estado === "en_local") return "rgba(245, 158, 11, 0.05)";
+  if (estado === "entregado") return "rgba(16, 185, 129, 0.05)";
+  if (estado === "cancelado") return "rgba(107, 114, 128, 0.05)";
+  return "var(--bg-card)";
 };
 
 const formatearPesos = (valor: number) => {

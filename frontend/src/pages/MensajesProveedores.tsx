@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+// removed useNavigate import
 import {
   listarConversacionesProveedoresRequest,
   obtenerMensajesProveedorRequest,
@@ -29,8 +29,9 @@ function ChatImage({ src }: { src: string }) {
   );
 }
 
+import Layout from "../components/Layout";
+
 function MensajesProveedores() {
-  const navigate = useNavigate();
   const [conversaciones, setConversaciones] = useState<any[]>([]);
   const [telefonoActivo, setTelefonoActivo] = useState<string | null>(null);
   const [proveedorActivoNombre, setProveedorActivoNombre] = useState<string>("");
@@ -153,14 +154,12 @@ function MensajesProveedores() {
   };
 
   return (
+    <Layout>
     <div className={`mensajes-container ${showMobileChat ? "mobile-chat-active" : ""}`}>
       {/* Sidebar: Lista de conversaciones */}
       <div className="conversaciones-sidebar">
         <div className="conversaciones-header">
           <h2>Mensajes</h2>
-          <button className="btn-volver-dashboard" onClick={() => navigate("/dashboard")}>
-            Volver
-          </button>
         </div>
         <div className="conversaciones-lista">
           {conversaciones.map((conv) => (
@@ -304,6 +303,7 @@ function MensajesProveedores() {
         </div>
       )}
     </div>
+    </Layout>
   );
 }
 

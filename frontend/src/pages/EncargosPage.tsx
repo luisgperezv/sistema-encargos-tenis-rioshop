@@ -1,12 +1,11 @@
-import Header from "../components/Header";
+import Layout from "../components/Layout";
 import ListarEncargos from "../components/ListarEncargos";
 
 function EncargosPage() {
   return (
-    <div className="app-panel">
-      <Header />
+    <Layout>
       <ListarEncargos />
-    </div>
+    </Layout>
   );
 }
 
