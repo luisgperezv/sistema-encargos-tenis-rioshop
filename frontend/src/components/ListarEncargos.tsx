@@ -13,7 +13,8 @@ import "./ListarEncargos.css";
 
 const colorEstado = (estado: string) => {
   if (estado === "pendiente") return "rgba(239, 68, 68, 0.05)";
-  if (estado === "pedido" || estado === "despachado" || estado === "en_local") return "rgba(245, 158, 11, 0.05)";
+  if (estado === "pedido" || estado === "despachado" || estado === "en_local")
+    return "rgba(245, 158, 11, 0.05)";
   if (estado === "entregado") return "rgba(16, 185, 129, 0.05)";
   if (estado === "cancelado") return "rgba(107, 114, 128, 0.05)";
   return "var(--bg-card)";
@@ -34,8 +35,11 @@ function ListarEncargos() {
   const [buscar, setBuscar] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState("");
 
-  const [encargoReenviando, setEncargoReenviando] = useState<number | null>(null);
-  const [proveedorSeleccionadoReenvio, setProveedorSeleccionadoReenvio] = useState<string>("");
+  const [encargoReenviando, setEncargoReenviando] = useState<number | null>(
+    null,
+  );
+  const [proveedorSeleccionadoReenvio, setProveedorSeleccionadoReenvio] =
+    useState<string>("");
 
   const [encargoEditando, setEncargoEditando] = useState<any | null>(null);
   const [proveedores, setProveedores] = useState<any[]>([]);
@@ -122,20 +126,29 @@ function ListarEncargos() {
   };
 
   const reenviarAlProveedor = async (encargo: any) => {
-    const proveedorId = proveedorSeleccionadoReenvio ? Number(proveedorSeleccionadoReenvio) : undefined;
-    const proveedorNombre = proveedores.find((p) => p.id === proveedorId)?.nombre || encargo.proveedor?.nombre || "desconocido";
+    const proveedorId = proveedorSeleccionadoReenvio
+      ? Number(proveedorSeleccionadoReenvio)
+      : undefined;
+    const proveedorNombre =
+      proveedores.find((p) => p.id === proveedorId)?.nombre ||
+      encargo.proveedor?.nombre ||
+      "desconocido";
 
     const confirmar = window.confirm(
-      `¿Reenviar el encargo #${encargo.id} al proveedor ${proveedorNombre}?`
+      `¿Reenviar el encargo #${encargo.id} al proveedor ${proveedorNombre}?`,
     );
 
     if (!confirmar) return;
 
     setMensaje("⏳ Reenviando encargo al proveedor...");
 
-    const respuesta = await reenviarEncargoProveedorRequest(encargo.id, proveedorId);
+    const respuesta = await reenviarEncargoProveedorRequest(
+      encargo.id,
+      proveedorId,
+    );
 
     if (respuesta.mensaje) {
+      alert("Mensaje reenviado exitosamente");
       setMensaje(`✅ ${respuesta.mensaje}`);
     } else if (respuesta.detail) {
       setMensaje(`❌ ${respuesta.detail}`);
@@ -522,15 +535,20 @@ function ListarEncargos() {
                     </>
                   )}
 
-                {(encargo.estado === "pendiente" || encargo.estado === "pedido") && (
-                  encargoReenviando === encargo.id ? (
+                {(encargo.estado === "pendiente" ||
+                  encargo.estado === "pedido") &&
+                  (encargoReenviando === encargo.id ? (
                     <div className="reenvio-container">
                       <select
                         value={proveedorSeleccionadoReenvio}
-                        onChange={(e) => setProveedorSeleccionadoReenvio(e.target.value)}
+                        onChange={(e) =>
+                          setProveedorSeleccionadoReenvio(e.target.value)
+                        }
                       >
                         <option value="">
-                          {encargo.proveedor ? `Usar asignado (${encargo.proveedor.nombre})` : "Seleccionar proveedor..."}
+                          {encargo.proveedor
+                            ? `Usar asignado (${encargo.proveedor.nombre})`
+                            : "Seleccionar proveedor..."}
                         </option>
                         {proveedores.map((p) => (
                           <option key={p.id} value={p.id}>
@@ -566,8 +584,7 @@ function ListarEncargos() {
                     >
                       Reenviar a proveedor
                     </button>
-                  )
-                )}
+                  ))}
 
                 <select
                   value={encargo.estado}
