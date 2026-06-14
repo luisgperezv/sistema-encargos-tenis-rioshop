@@ -29,5 +29,13 @@ class Encargo(Base):
 
     observaciones = Column(String, nullable=True)
 
+    costo_base = Column(Float, nullable=True)
+    costo_envio = Column(Float, nullable=True)
+    costo_despachador = Column(Float, nullable=True)
+    costo_total = Column(Float, nullable=True)
+    utilidad_estimada = Column(Float, nullable=True)
+    fecha_despacho = Column(String, nullable=True)
+    fecha_entregado = Column(String, nullable=True)
+
     cliente = relationship("Cliente", back_populates="encargos")
     proveedor = relationship("Proveedor", back_populates="encargos")

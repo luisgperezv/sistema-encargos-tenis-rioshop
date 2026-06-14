@@ -178,6 +178,9 @@ class EncargoUpdate(BaseModel):
 
 class EncargoEstadoUpdate(BaseModel):
     estado: str
+    costo_base: Optional[float] = None
+    costo_envio: Optional[float] = None
+    costo_despachador: Optional[float] = None
 
     @field_validator("estado")
     @classmethod
@@ -216,6 +219,13 @@ class EncargoResponse(BaseModel):
     fecha_creacion: str
     fecha_entrega_estimada: str | None = None
     observaciones: str | None = None
+    costo_base: Optional[float] = None
+    costo_envio: Optional[float] = None
+    costo_despachador: Optional[float] = None
+    costo_total: Optional[float] = None
+    utilidad_estimada: Optional[float] = None
+    fecha_despacho: Optional[str] = None
+    fecha_entregado: Optional[str] = None
     cliente: ClienteMiniResponse
     proveedor: ProveedorMiniResponse | None = None
 

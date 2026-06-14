@@ -398,6 +398,13 @@ def actualizar_estado(
     db: Session = Depends(get_db),
     current_user: str = Depends(get_current_user),
 ):
+    print("=== DEBUG DESPACHADO ===")
+    print("data.estado:", data.estado)
+    print("data.costo_base:", data.costo_base)
+    print("data.costo_envio:", data.costo_envio)
+    print("data.costo_despachador:", data.costo_despachador)
+    print("data dict:", data.dict())
+
     encargo = db.query(Encargo).filter(Encargo.id == encargo_id).first()
 
     if not encargo:
@@ -406,14 +413,53 @@ def actualizar_estado(
     if data.estado not in ESTADOS_VALIDOS:
         raise HTTPException(status_code=400, detail="Estado no válido")
 
-    if data.estado == "entregado" and encargo.saldo > 0:
-        raise HTTPException(
-            status_code=400,
-            detail="No se puede entregar un encargo con saldo pendiente",
-        )
+    if data.estado == "despachado":
+        if (
+            data.costo_base is None
+            or data.costo_envio is None
+            or data.costo_despachador is None
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="Se requieren costo_base, costo_envio y costo_despachador para despachar el encargo",
+            )
+        if (
+            data.costo_base < 0
+            or data.costo_envio < 0
+            or data.costo_despachador < 0
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="Los costos no pueden ser negativos",
+            )
+        encargo.costo_base = data.costo_base
+        encargo.costo_envio = data.costo_envio
+        encargo.costo_despachador = data.costo_despachador
+        encargo.costo_total = data.costo_base + data.costo_envio + data.costo_despachador
+        encargo.utilidad_estimada = encargo.precio - encargo.costo_total
+        encargo.fecha_despacho = str(date.today())
+
+    if data.estado == "entregado":
+        if encargo.saldo > 0:
+            raise HTTPException(
+                status_code=400,
+                detail="No se puede entregar un encargo con saldo pendiente",
+            )
+        if encargo.costo_total is None or encargo.costo_total <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail="No se puede entregar un encargo sin registrar costos válidos (costo_total debe ser mayor a 0)",
+            )
+        encargo.fecha_entregado = str(date.today())
 
     estado_anterior = encargo.estado
     encargo.estado = data.estado
+
+    print("encargo.costo_base:", encargo.costo_base)
+    print("encargo.costo_envio:", encargo.costo_envio)
+    print("encargo.costo_despachador:", encargo.costo_despachador)
+    print("encargo.costo_total:", encargo.costo_total)
+    print("encargo.utilidad_estimada:", encargo.utilidad_estimada)
 
     db.commit()
     db.refresh(encargo)
@@ -502,6 +548,9 @@ def editar_encargo(
     encargo.fecha_entrega_estimada = data.fecha_entrega_estimada
     encargo.observaciones = data.observaciones
     encargo.saldo = saldo
+
+    if encargo.costo_total is not None:
+        encargo.utilidad_estimada = data.precio - encargo.costo_total
 
     if proveedor is not None:
         encargo.proveedor = proveedor

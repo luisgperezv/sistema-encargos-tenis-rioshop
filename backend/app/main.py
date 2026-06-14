@@ -20,8 +20,8 @@ Base.metadata.create_all(bind=engine)
 
 def ejecutar_migraciones_ligeras():
     """
-    Agrega de manera segura y defensiva las nuevas columnas a la tabla mensajes_proveedores
-    si no existen. No bloquea el arranque del servidor si ocurre algún error.
+    Agrega de manera segura y defensiva las nuevas columnas a las tablas mensajes_proveedores
+    y encargos si no existen. No bloquea el arranque del servidor si ocurre algún error.
     """
     from sqlalchemy import text
     from app.database import SessionLocal
@@ -30,14 +30,15 @@ def ejecutar_migraciones_ligeras():
     print("[MIGRACIÓN] Iniciando verificación de base de datos...", flush=True)
     db = SessionLocal()
     
-    columnas_nuevas = {
+    # 1. Verificar/agregar columnas en mensajes_proveedores
+    columnas_mensajes = {
         "media_url": "VARCHAR",
         "reply_to_whatsapp_message_id": "VARCHAR",
         "reply_to_text": "TEXT",
         "reply_to_media_url": "VARCHAR"
     }
     
-    for col, col_type in columnas_nuevas.items():
+    for col, col_type in columnas_mensajes.items():
         try:
             db.execute(text(f"SELECT {col} FROM mensajes_proveedores LIMIT 1"))
             print(f"[MIGRACIÓN] La columna {col} ya existe en la tabla mensajes_proveedores.", flush=True)
@@ -54,6 +55,36 @@ def ejecutar_migraciones_ligeras():
                     f"[MIGRACIÓN WARNING] No se pudo agregar la columna {col} automáticamente: {str(alter_err)}. "
                     "Es posible que deba agregarse manualmente."
                 )
+                
+    # 2. Verificar/agregar columnas en encargos
+    columnas_encargos = {
+        "costo_base": "DOUBLE PRECISION",
+        "costo_envio": "DOUBLE PRECISION",
+        "costo_despachador": "DOUBLE PRECISION",
+        "costo_total": "DOUBLE PRECISION",
+        "utilidad_estimada": "DOUBLE PRECISION",
+        "fecha_despacho": "VARCHAR",
+        "fecha_entregado": "VARCHAR"
+    }
+    
+    for col, col_type in columnas_encargos.items():
+        try:
+            db.execute(text(f"SELECT {col} FROM encargos LIMIT 1"))
+            print(f"[MIGRACIÓN] La columna {col} ya existe en la tabla encargos.", flush=True)
+        except Exception:
+            db.rollback()
+            print(f"[MIGRACIÓN] La columna {col} no existe en la tabla encargos. Intentando agregarla...", flush=True)
+            try:
+                db.execute(text(f"ALTER TABLE encargos ADD COLUMN {col} {col_type}"))
+                db.commit()
+                print(f"[MIGRACIÓN] Columna {col} añadida exitosamente a la tabla encargos.", flush=True)
+            except Exception as alter_err:
+                db.rollback()
+                logging.warning(
+                    f"[MIGRACIÓN WARNING] No se pudo agregar la columna {col} a la tabla encargos automáticamente: {str(alter_err)}. "
+                    "Es posible que deba agregarse manualmente."
+                )
+                
     db.close()
 
 
