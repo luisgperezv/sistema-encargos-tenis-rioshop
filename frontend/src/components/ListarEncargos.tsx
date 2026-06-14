@@ -53,6 +53,12 @@ function ListarEncargos() {
   const [editProveedorId, setEditProveedorId] = useState("");
   const [editFoto, setEditFoto] = useState<File | null>(null);
 
+  const [showCostoModal, setShowCostoModal] = useState(false);
+  const [modalEncargoId, setModalEncargoId] = useState<number | null>(null);
+  const [costoBaseInput, setCostoBaseInput] = useState("");
+  const [costoEnvioInput, setCostoEnvioInput] = useState("");
+  const [costoDespachadorInput, setCostoDespachadorInput] = useState("");
+
   const totalEncargos = encargos.length;
 
   const totalPendientes = encargos.filter(
@@ -97,6 +103,80 @@ function ListarEncargos() {
     } else {
       alert("Error al actualizar estado");
     }
+  };
+
+  const handleSelectEstado = (encargo: any, nuevoEstado: string) => {
+    if (nuevoEstado === "despachado") {
+      setModalEncargoId(encargo.id);
+      setCostoBaseInput(encargo.costo_base !== null && encargo.costo_base !== undefined ? String(encargo.costo_base) : "");
+      setCostoEnvioInput(encargo.costo_envio !== null && encargo.costo_envio !== undefined ? String(encargo.costo_envio) : "");
+      setCostoDespachadorInput(encargo.costo_despachador !== null && encargo.costo_despachador !== undefined ? String(encargo.costo_despachador) : "");
+      setShowCostoModal(true);
+    } else if (nuevoEstado === "entregado") {
+      const saldo = Number(encargo.saldo || 0);
+      const costoTotal = Number(encargo.costo_total || 0);
+      if (saldo > 0) {
+        alert("⚠️ No se puede entregar un encargo con saldo pendiente.");
+        return;
+      }
+      if (costoTotal <= 0) {
+        alert("⚠️ No se puede entregar un encargo sin registrar costos válidos (costo total debe ser mayor a 0).");
+        return;
+      }
+      cambiarEstado(encargo.id, nuevoEstado);
+    } else {
+      cambiarEstado(encargo.id, nuevoEstado);
+    }
+  };
+
+  const confirmarDespacho = async () => {
+    if (modalEncargoId === null) return;
+    
+    const costoBase = Number(costoBaseInput);
+    const costoEnvio = Number(costoEnvioInput);
+    const costoDespachador = Number(costoDespachadorInput);
+
+    if (isNaN(costoBase) || costoBase < 0) {
+      alert("⚠️ El costo base debe ser un número mayor o igual a 0");
+      return;
+    }
+    if (isNaN(costoEnvio) || costoEnvio < 0) {
+      alert("⚠️ El costo de envío debe ser un número mayor o igual a 0");
+      return;
+    }
+    if (isNaN(costoDespachador) || costoDespachador < 0) {
+      alert("⚠️ El costo del despachador debe ser un número mayor o igual a 0");
+      return;
+    }
+
+    const costos = {
+      costo_base: costoBase,
+      costo_envio: costoEnvio,
+      costo_despachador: costoDespachador,
+    };
+
+    const respuesta = await actualizarEstadoEncargoRequest(
+      modalEncargoId,
+      "despachado",
+      costos
+    );
+
+    if (respuesta.id) {
+      setEncargos((prev) =>
+        prev.map((encargo) => (encargo.id === modalEncargoId ? respuesta : encargo)),
+      );
+      setShowCostoModal(false);
+      setModalEncargoId(null);
+    } else if (respuesta.detail) {
+      alert(respuesta.detail);
+    } else {
+      alert("Error al despachar el encargo");
+    }
+  };
+
+  const cancelarModalDespacho = () => {
+    setShowCostoModal(false);
+    setModalEncargoId(null);
   };
 
   const agregarAbono = async (encargoId: number) => {
@@ -501,6 +581,29 @@ function ListarEncargos() {
                   <strong>Saldo:</strong> {formatearPesos(encargo.saldo)}
                 </p>
 
+                {Number(encargo.costo_total || 0) > 0 && (
+                  <>
+                    <p>
+                      <strong>Costo Base:</strong> {formatearPesos(Number(encargo.costo_base || 0))}
+                    </p>
+                    <p>
+                      <strong>Costo Envío:</strong> {formatearPesos(Number(encargo.costo_envio || 0))}
+                    </p>
+                    <p>
+                      <strong>Costo Despachador:</strong> {formatearPesos(Number(encargo.costo_despachador || 0))}
+                    </p>
+                    <p>
+                      <strong>Costo Total:</strong> {formatearPesos(Number(encargo.costo_total || 0))}
+                    </p>
+                    <p>
+                      <strong>Utilidad Est.:</strong>{" "}
+                      <span style={{ color: Number(encargo.utilidad_estimada || 0) >= 0 ? "#10b981" : "#ef4444", fontWeight: "bold" }}>
+                        {formatearPesos(Number(encargo.utilidad_estimada || 0))}
+                      </span>
+                    </p>
+                  </>
+                )}
+
                 <p>
                   <strong>Estado:</strong> {encargo.estado}
                 </p>
@@ -508,6 +611,18 @@ function ListarEncargos() {
                 <p>
                   <strong>Fecha:</strong> {encargo.fecha_creacion}
                 </p>
+
+                {encargo.fecha_despacho && (
+                  <p>
+                    <strong>Fecha Despacho:</strong> {encargo.fecha_despacho}
+                  </p>
+                )}
+
+                {encargo.fecha_entregado && (
+                  <p>
+                    <strong>Fecha Entrega:</strong> {encargo.fecha_entregado}
+                  </p>
+                )}
               </div>
 
               <div className="acciones">
@@ -588,13 +703,18 @@ function ListarEncargos() {
 
                 <select
                   value={encargo.estado}
-                  onChange={(e) => cambiarEstado(encargo.id, e.target.value)}
+                  onChange={(e) => handleSelectEstado(encargo, e.target.value)}
                 >
                   <option value="pendiente">Pendiente</option>
                   <option value="pedido">Pedido</option>
                   <option value="despachado">Despachado</option>
                   <option value="en_local">En local</option>
-                  <option value="entregado">Entregado</option>
+                  <option 
+                    value="entregado" 
+                    disabled={Number(encargo.saldo || 0) > 0 || Number(encargo.costo_total || 0) <= 0}
+                  >
+                    Entregado { (Number(encargo.saldo || 0) > 0 || Number(encargo.costo_total || 0) <= 0) ? "(Bloqueado)" : "" }
+                  </option>
                   <option value="cancelado">Cancelado</option>
                 </select>
               </div>
@@ -602,6 +722,51 @@ function ListarEncargos() {
           </div>
         </div>
       ))}
+
+      {showCostoModal && (
+        <div className="costos-modal-overlay">
+          <div className="costos-modal-content">
+            <h3>Registrar Costos (Encargo #{modalEncargoId})</h3>
+            <div className="costos-modal-inputs">
+              <div className="modal-campo">
+                <label>Costo Base (Bodega):</label>
+                <input
+                  type="number"
+                  placeholder="Ej: 120000"
+                  value={costoBaseInput}
+                  onChange={(e) => setCostoBaseInput(e.target.value)}
+                />
+              </div>
+              <div className="modal-campo">
+                <label>Costo Envío:</label>
+                <input
+                  type="number"
+                  placeholder="Ej: 15000"
+                  value={costoEnvioInput}
+                  onChange={(e) => setCostoEnvioInput(e.target.value)}
+                />
+              </div>
+              <div className="modal-campo">
+                <label>Costo Despachador:</label>
+                <input
+                  type="number"
+                  placeholder="Ej: 5000"
+                  value={costoDespachadorInput}
+                  onChange={(e) => setCostoDespachadorInput(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="modal-acciones">
+              <button className="btn btn-primary" onClick={confirmarDespacho}>
+                Confirmar Despacho
+              </button>
+              <button className="btn btn-secondary" onClick={cancelarModalDespacho}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -170,9 +170,11 @@ export const listarEncargosRequest = async (
 
 export const actualizarEstadoEncargoRequest = async (
   encargoId: number,
-  estado: string
+  estado: string,
+  costos?: { costo_base: number; costo_envio: number; costo_despachador: number }
 ) => {
   const token = localStorage.getItem("token");
+  const body = costos ? { estado, ...costos } : { estado };
 
   const res = await fetch(
     `${API_URL}/encargos/${encargoId}/estado`,
@@ -182,7 +184,7 @@ export const actualizarEstadoEncargoRequest = async (
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ estado }),
+      body: JSON.stringify(body),
     }
   );
 
