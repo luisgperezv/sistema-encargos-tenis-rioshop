@@ -390,6 +390,13 @@ function ListarEncargos() {
         </div>
       </div>
 
+      {(buscar.trim() !== "" || estadoFiltro !== "") && encargos.length === 0 && (
+        <div className="busqueda-sin-resultados">
+          <p className="sin-resultados-principal">🔍 No se encontraron encargos para la búsqueda realizada.</p>
+          <p className="sin-resultados-secundario">Verifica los datos ingresados o intenta con otro criterio de búsqueda.</p>
+        </div>
+      )}
+
       {mensaje && <p className="mensaje">{mensaje}</p>}
 
       {encargos.map((encargo) => (

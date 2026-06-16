@@ -499,3 +499,29 @@
   font-size: 0.9rem;
   transition: all var(--transition-fast);
 }
+
+.busqueda-sin-resultados {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  padding: 2.5rem 2rem;
+  text-align: center;
+  margin-bottom: 2rem;
+  box-shadow: var(--shadow-md);
+  animation: fadeIn var(--transition-normal);
+}
+
+.sin-resultados-principal {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 0.75rem 0;
+}
+
+.sin-resultados-secundario {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
