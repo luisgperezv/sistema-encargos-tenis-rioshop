@@ -340,7 +340,7 @@ function ListarEncargos() {
 
       <div className="filtros">
         <input
-          placeholder="Buscar por cliente, referencia o ID"
+          placeholder="Buscar por cliente, teléfono, referencia o ID"
           value={buscar}
           onChange={(e) => setBuscar(e.target.value)}
         />

@@ -260,6 +260,7 @@ def listar_encargos(
         query = query.filter(
             or_(
                 Cliente.nombre.ilike(f"%{buscar}%"),
+                Cliente.telefono.ilike(f"%{buscar}%"),
                 Encargo.referencia.ilike(f"%{buscar}%"),
                 Encargo.id.cast(String).ilike(f"%{buscar}%"),
             )
