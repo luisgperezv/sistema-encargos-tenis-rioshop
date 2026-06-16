@@ -171,10 +171,15 @@ export const listarEncargosRequest = async (
 export const actualizarEstadoEncargoRequest = async (
   encargoId: number,
   estado: string,
-  costos?: { costo_base: number; costo_envio: number; costo_despachador: number }
+  extras?: {
+    costo_base?: number;
+    costo_envio?: number;
+    costo_despachador?: number;
+    motivo_cancelacion?: string;
+  }
 ) => {
   const token = localStorage.getItem("token");
-  const body = costos ? { estado, ...costos } : { estado };
+  const body = extras ? { estado, ...extras } : { estado };
 
   const res = await fetch(
     `${API_URL}/encargos/${encargoId}/estado`,

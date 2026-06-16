@@ -64,7 +64,9 @@ def ejecutar_migraciones_ligeras():
         "costo_total": "DOUBLE PRECISION",
         "utilidad_estimada": "DOUBLE PRECISION",
         "fecha_despacho": "VARCHAR",
-        "fecha_entregado": "VARCHAR"
+        "fecha_entregado": "VARCHAR",
+        "motivo_cancelacion": "VARCHAR",
+        "fecha_cancelacion": "VARCHAR"
     }
     
     for col, col_type in columnas_encargos.items():

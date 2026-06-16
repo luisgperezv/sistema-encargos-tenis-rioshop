@@ -59,6 +59,11 @@ function ListarEncargos() {
   const [costoEnvioInput, setCostoEnvioInput] = useState("");
   const [costoDespachadorInput, setCostoDespachadorInput] = useState("");
 
+  const [showCancelacionModal, setShowCancelacionModal] = useState(false);
+  const [cancelacionEncargoId, setCancelacionEncargoId] = useState<number | null>(null);
+  const [motivoCancelacionInput, setMotivoCancelacionInput] = useState("");
+  const [errorCancelacion, setErrorCancelacion] = useState("");
+
   const totalEncargos = encargos.length;
 
   const totalPendientes = encargos.filter(
@@ -112,6 +117,11 @@ function ListarEncargos() {
       setCostoEnvioInput(encargo.costo_envio !== null && encargo.costo_envio !== undefined ? String(encargo.costo_envio) : "");
       setCostoDespachadorInput(encargo.costo_despachador !== null && encargo.costo_despachador !== undefined ? String(encargo.costo_despachador) : "");
       setShowCostoModal(true);
+    } else if (nuevoEstado === "cancelado") {
+      setCancelacionEncargoId(encargo.id);
+      setMotivoCancelacionInput("");
+      setErrorCancelacion("");
+      setShowCancelacionModal(true);
     } else if (nuevoEstado === "entregado") {
       const saldo = Number(encargo.saldo || 0);
       const costoTotal = Number(encargo.costo_total || 0);
@@ -177,6 +187,42 @@ function ListarEncargos() {
   const cancelarModalDespacho = () => {
     setShowCostoModal(false);
     setModalEncargoId(null);
+  };
+
+  const confirmarCancelacion = async () => {
+    if (cancelacionEncargoId === null) return;
+    
+    if (!motivoCancelacionInput.trim()) {
+      setErrorCancelacion("El motivo de cancelación es obligatorio.");
+      return;
+    }
+
+    const respuesta = await actualizarEstadoEncargoRequest(
+      cancelacionEncargoId,
+      "cancelado",
+      { motivo_cancelacion: motivoCancelacionInput.trim() }
+    );
+
+    if (respuesta.id) {
+      setEncargos((prev) =>
+        prev.map((encargo) => (encargo.id === cancelacionEncargoId ? respuesta : encargo)),
+      );
+      setShowCancelacionModal(false);
+      setCancelacionEncargoId(null);
+      setMotivoCancelacionInput("");
+      setErrorCancelacion("");
+    } else if (respuesta.detail) {
+      setErrorCancelacion(respuesta.detail);
+    } else {
+      setErrorCancelacion("Error al cancelar el encargo");
+    }
+  };
+
+  const cancelarModalCancelacion = () => {
+    setShowCancelacionModal(false);
+    setCancelacionEncargoId(null);
+    setMotivoCancelacionInput("");
+    setErrorCancelacion("");
   };
 
   const agregarAbono = async (encargoId: number) => {
@@ -430,15 +476,7 @@ function ListarEncargos() {
 
                   <button
                     className="btn btn-danger"
-                    onClick={() => {
-                      const confirmar = window.confirm(
-                        "¿Seguro que deseas cancelar este encargo?",
-                      );
-
-                      if (confirmar) {
-                        cambiarEstado(encargo.id, "cancelado");
-                      }
-                    }}
+                    onClick={() => handleSelectEstado(encargo, "cancelado")}
                   >
                     Cancelar
                   </button>
@@ -630,6 +668,18 @@ function ListarEncargos() {
                     <strong>Fecha Entrega:</strong> {encargo.fecha_entregado}
                   </p>
                 )}
+
+                {encargo.motivo_cancelacion && (
+                  <p>
+                    <strong>Motivo Cancelación:</strong> {encargo.motivo_cancelacion}
+                  </p>
+                )}
+
+                {encargo.fecha_cancelacion && (
+                  <p>
+                    <strong>Fecha Cancelación:</strong> {encargo.fecha_cancelacion}
+                  </p>
+                )}
               </div>
 
               <div className="acciones">
@@ -768,6 +818,36 @@ function ListarEncargos() {
                 Confirmar Despacho
               </button>
               <button className="btn btn-secondary" onClick={cancelarModalDespacho}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCancelacionModal && (
+        <div className="costos-modal-overlay">
+          <div className="costos-modal-content">
+            <h3>Cancelar Encargo (Encargo #{cancelacionEncargoId})</h3>
+            <div className="costos-modal-inputs">
+              <div className="modal-campo">
+                <label>Motivo de cancelación:</label>
+                <textarea
+                  placeholder="Escribe el motivo de la cancelación aquí..."
+                  value={motivoCancelacionInput}
+                  onChange={(e) => {
+                    setMotivoCancelacionInput(e.target.value);
+                    if (e.target.value.trim()) setErrorCancelacion("");
+                  }}
+                />
+                {errorCancelacion && <p className="error-mensaje">{errorCancelacion}</p>}
+              </div>
+            </div>
+            <div className="modal-acciones">
+              <button className="btn btn-danger" onClick={confirmarCancelacion}>
+                Confirmar Cancelación
+              </button>
+              <button className="btn btn-secondary" onClick={cancelarModalCancelacion}>
                 Cancelar
               </button>
             </div>

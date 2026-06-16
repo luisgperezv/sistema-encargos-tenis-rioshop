@@ -453,6 +453,15 @@ def actualizar_estado(
             )
         encargo.fecha_entregado = str(date.today())
 
+    if data.estado == "cancelado":
+        if not data.motivo_cancelacion or not data.motivo_cancelacion.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="El motivo de cancelación es obligatorio para cancelar el encargo",
+            )
+        encargo.motivo_cancelacion = data.motivo_cancelacion.strip()
+        encargo.fecha_cancelacion = str(date.today())
+
     estado_anterior = encargo.estado
     encargo.estado = data.estado
 

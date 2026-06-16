@@ -36,6 +36,8 @@ class Encargo(Base):
     utilidad_estimada = Column(Float, nullable=True)
     fecha_despacho = Column(String, nullable=True)
     fecha_entregado = Column(String, nullable=True)
+    motivo_cancelacion = Column(String, nullable=True)
+    fecha_cancelacion = Column(String, nullable=True)
 
     cliente = relationship("Cliente", back_populates="encargos")
     proveedor = relationship("Proveedor", back_populates="encargos")
