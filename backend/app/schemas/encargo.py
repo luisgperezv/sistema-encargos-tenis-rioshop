@@ -182,6 +182,7 @@ class EncargoEstadoUpdate(BaseModel):
     costo_envio: Optional[float] = None
     costo_despachador: Optional[float] = None
     motivo_cancelacion: Optional[str] = None
+    metodo_pago: Optional[str] = None
 
     @field_validator("estado")
     @classmethod
@@ -229,6 +230,7 @@ class EncargoResponse(BaseModel):
     fecha_entregado: Optional[str] = None
     motivo_cancelacion: Optional[str] = None
     fecha_cancelacion: Optional[str] = None
+    metodo_pago: Optional[str] = None
     cliente: ClienteMiniResponse
     proveedor: ProveedorMiniResponse | None = None
 

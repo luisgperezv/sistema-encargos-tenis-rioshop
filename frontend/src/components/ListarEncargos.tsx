@@ -64,6 +64,11 @@ function ListarEncargos() {
   const [motivoCancelacionInput, setMotivoCancelacionInput] = useState("");
   const [errorCancelacion, setErrorCancelacion] = useState("");
 
+  const [showPagoModal, setShowPagoModal] = useState(false);
+  const [pagoEncargoId, setPagoEncargoId] = useState<number | null>(null);
+  const [metodoPagoInput, setMetodoPagoInput] = useState("");
+  const [errorPago, setErrorPago] = useState("");
+
   const totalEncargos = encargos.length;
 
   const totalPendientes = encargos.filter(
@@ -123,6 +128,9 @@ function ListarEncargos() {
       setErrorCancelacion("");
       setShowCancelacionModal(true);
     } else if (nuevoEstado === "entregado") {
+      if (encargo.estado === "entregado" && encargo.metodo_pago) {
+        return;
+      }
       const saldo = Number(encargo.saldo || 0);
       const costoTotal = Number(encargo.costo_total || 0);
       if (saldo > 0) {
@@ -133,7 +141,10 @@ function ListarEncargos() {
         alert("⚠️ No se puede entregar un encargo sin registrar costos válidos (costo total debe ser mayor a 0).");
         return;
       }
-      cambiarEstado(encargo.id, nuevoEstado);
+      setPagoEncargoId(encargo.id);
+      setMetodoPagoInput(encargo.metodo_pago || "");
+      setErrorPago("");
+      setShowPagoModal(true);
     } else {
       cambiarEstado(encargo.id, nuevoEstado);
     }
@@ -223,6 +234,42 @@ function ListarEncargos() {
     setCancelacionEncargoId(null);
     setMotivoCancelacionInput("");
     setErrorCancelacion("");
+  };
+
+  const confirmarEntrega = async () => {
+    if (pagoEncargoId === null) return;
+
+    if (!metodoPagoInput) {
+      setErrorPago("El método de pago es obligatorio.");
+      return;
+    }
+
+    const respuesta = await actualizarEstadoEncargoRequest(
+      pagoEncargoId,
+      "entregado",
+      { metodo_pago: metodoPagoInput }
+    );
+
+    if (respuesta.id) {
+      setEncargos((prev) =>
+        prev.map((encargo) => (encargo.id === pagoEncargoId ? respuesta : encargo)),
+      );
+      setShowPagoModal(false);
+      setPagoEncargoId(null);
+      setMetodoPagoInput("");
+      setErrorPago("");
+    } else if (respuesta.detail) {
+      setErrorPago(respuesta.detail);
+    } else {
+      setErrorPago("Error al entregar el encargo");
+    }
+  };
+
+  const cancelarModalPago = () => {
+    setShowPagoModal(false);
+    setPagoEncargoId(null);
+    setMetodoPagoInput("");
+    setErrorPago("");
   };
 
   const agregarAbono = async (encargoId: number) => {
@@ -669,6 +716,12 @@ function ListarEncargos() {
                   </p>
                 )}
 
+                {encargo.metodo_pago && (
+                  <p className="metodo-pago-destacado">
+                    <strong>Método de Pago:</strong> <span>{encargo.metodo_pago}</span>
+                  </p>
+                )}
+
                 {encargo.motivo_cancelacion && (
                   <p>
                     <strong>Motivo Cancelación:</strong> {encargo.motivo_cancelacion}
@@ -848,6 +901,43 @@ function ListarEncargos() {
                 Confirmar Cancelación
               </button>
               <button className="btn btn-secondary" onClick={cancelarModalCancelacion}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPagoModal && (
+        <div className="costos-modal-overlay">
+          <div className="costos-modal-content">
+            <h3>Registrar Método de Pago (Encargo #{pagoEncargoId})</h3>
+            <div className="costos-modal-inputs">
+              <div className="modal-campo">
+                <label>Método de Pago:</label>
+                <select
+                  value={metodoPagoInput}
+                  onChange={(e) => {
+                    setMetodoPagoInput(e.target.value);
+                    if (e.target.value) setErrorPago("");
+                  }}
+                >
+                  <option value="">Selecciona método de pago...</option>
+                  <option value="Efectivo">Efectivo</option>
+                  <option value="Transferencia">Transferencia</option>
+                  <option value="Tarjeta Débito">Tarjeta Débito</option>
+                  <option value="Tarjeta Crédito">Tarjeta Crédito</option>
+                  <option value="Addi">Addi</option>
+                  <option value="Sistecrédito">Sistecrédito</option>
+                </select>
+                {errorPago && <p className="error-mensaje">{errorPago}</p>}
+              </div>
+            </div>
+            <div className="modal-acciones">
+              <button className="btn btn-primary" onClick={confirmarEntrega}>
+                Confirmar Entrega
+              </button>
+              <button className="btn btn-secondary" onClick={cancelarModalPago}>
                 Cancelar
               </button>
             </div>

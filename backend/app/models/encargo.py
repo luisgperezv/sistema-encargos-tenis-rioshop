@@ -38,6 +38,7 @@ class Encargo(Base):
     fecha_entregado = Column(String, nullable=True)
     motivo_cancelacion = Column(String, nullable=True)
     fecha_cancelacion = Column(String, nullable=True)
+    metodo_pago = Column(String, nullable=True)
 
     cliente = relationship("Cliente", back_populates="encargos")
     proveedor = relationship("Proveedor", back_populates="encargos")

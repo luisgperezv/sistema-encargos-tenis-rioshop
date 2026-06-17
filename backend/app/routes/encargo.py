@@ -451,7 +451,37 @@ def actualizar_estado(
                 status_code=400,
                 detail="No se puede entregar un encargo sin registrar costos válidos (costo_total debe ser mayor a 0)",
             )
-        encargo.fecha_entregado = str(date.today())
+        
+        if encargo.estado == "entregado" and encargo.metodo_pago:
+            if data.metodo_pago and data.metodo_pago != encargo.metodo_pago:
+                raise HTTPException(
+                    status_code=400,
+                    detail="No se permite modificar el método de pago una vez registrado",
+                )
+        else:
+            if not data.metodo_pago or not data.metodo_pago.strip():
+                raise HTTPException(
+                    status_code=400,
+                    detail="El método de pago es obligatorio para entregar el encargo",
+                )
+            
+            metodos_permitidos = [
+                "Efectivo",
+                "Transferencia",
+                "Tarjeta Débito",
+                "Tarjeta Crédito",
+                "Addi",
+                "Sistecrédito",
+            ]
+            if data.metodo_pago not in metodos_permitidos:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Método de pago no permitido. Debe ser uno de: {', '.join(metodos_permitidos)}",
+                )
+            encargo.metodo_pago = data.metodo_pago
+
+        if not encargo.fecha_entregado:
+            encargo.fecha_entregado = str(date.today())
 
     if data.estado == "cancelado":
         if not data.motivo_cancelacion or not data.motivo_cancelacion.strip():

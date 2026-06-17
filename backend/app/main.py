@@ -66,7 +66,8 @@ def ejecutar_migraciones_ligeras():
         "fecha_despacho": "VARCHAR",
         "fecha_entregado": "VARCHAR",
         "motivo_cancelacion": "VARCHAR",
-        "fecha_cancelacion": "VARCHAR"
+        "fecha_cancelacion": "VARCHAR",
+        "metodo_pago": "VARCHAR"
     }
     
     for col, col_type in columnas_encargos.items():
