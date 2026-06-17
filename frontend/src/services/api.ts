@@ -176,6 +176,7 @@ export const actualizarEstadoEncargoRequest = async (
     costo_envio?: number;
     costo_despachador?: number;
     motivo_cancelacion?: string;
+    metodo_pago?: string;
   }
 ) => {
   const token = localStorage.getItem("token");
