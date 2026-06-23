@@ -17,6 +17,7 @@ from app.services.whatsapp import (
     enviar_template_proveedor_foto,
 )
 from app.services.utils import formatear_pesos
+from app.services.ventas import crear_venta_desde_encargo_si_no_existe
 from app.core.config import settings
 
 cloudinary.config(
@@ -494,6 +495,10 @@ def actualizar_estado(
 
     estado_anterior = encargo.estado
     encargo.estado = data.estado
+
+    # Generar venta automática al cambiar a entregado
+    if data.estado == "entregado" and estado_anterior != "entregado":
+        crear_venta_desde_encargo_si_no_existe(db, encargo)
 
     print("encargo.costo_base:", encargo.costo_base)
     print("encargo.costo_envio:", encargo.costo_envio)

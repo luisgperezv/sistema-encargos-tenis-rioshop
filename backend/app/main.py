@@ -5,11 +5,13 @@ from app.models import cliente
 from app.models import encargo
 from app.models import proveedor
 from app.models import mensaje_proveedor
+from app.models import venta
 
 from app.routes import cliente as cliente_router
 from app.routes import encargo as encargo_router
 from app.routes import proveedor as proveedor_router
 from app.routes import mensaje_proveedor as mensaje_proveedor_router
+from app.routes import venta as venta_router
 
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -87,6 +89,37 @@ def ejecutar_migraciones_ligeras():
                     f"[MIGRACIÓN WARNING] No se pudo agregar la columna {col} a la tabla encargos automáticamente: {str(alter_err)}. "
                     "Es posible que deba agregarse manualmente."
                 )
+
+    # 3. Verificar/crear tabla ventas y columna origen
+    try:
+        db.execute(text("SELECT id FROM ventas LIMIT 1"))
+        print("[MIGRACIÓN] La tabla ventas ya existe.", flush=True)
+        # Verificar si existe la columna 'origen'
+        try:
+            db.execute(text("SELECT origen FROM ventas LIMIT 1"))
+            print("[MIGRACIÓN] La columna origen ya existe en la tabla ventas.", flush=True)
+        except Exception:
+            db.rollback()
+            print("[MIGRACIÓN] La columna origen no existe en la tabla ventas. Intentando agregarla...", flush=True)
+            try:
+                db.execute(text("ALTER TABLE ventas ADD COLUMN origen VARCHAR NOT NULL DEFAULT 'encargo'"))
+                db.commit()
+                print("[MIGRACIÓN] Columna origen añadida exitosamente a la tabla ventas.", flush=True)
+            except Exception as col_err:
+                db.rollback()
+                logging.warning(
+                    f"[MIGRACIÓN WARNING] No se pudo agregar la columna origen a la tabla ventas: {str(col_err)}."
+                )
+    except Exception:
+        db.rollback()
+        print("[MIGRACIÓN] La tabla ventas no existe. Creándola con sus restricciones...", flush=True)
+        try:
+            Base.metadata.create_all(bind=engine)
+            print("[MIGRACIÓN] Tabla ventas y sus restricciones creadas correctamente.", flush=True)
+        except Exception as create_err:
+            logging.warning(
+                f"[MIGRACIÓN WARNING] No se pudo crear la tabla ventas automáticamente: {str(create_err)}."
+            )
                 
     db.close()
 
@@ -117,6 +150,7 @@ app.include_router(encargo_router.router)
 app.include_router(proveedor_router.router)
 app.include_router(mensaje_proveedor_router.router)
 app.include_router(auth_router.router)
+app.include_router(venta_router.router)
 
 
 @app.get("/")
