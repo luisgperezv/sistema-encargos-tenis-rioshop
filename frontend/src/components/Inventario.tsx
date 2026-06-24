@@ -6,7 +6,7 @@ import {
   eliminarItemInventarioRequest,
   subirImagenRequest,
 } from "../services/api";
-import { Package, PlusCircle, Edit, Trash2, Search, Image as ImageIcon } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Search, Image as ImageIcon } from "lucide-react";
 import "./Inventario.css";
 
 type ArticuloInventario = {
