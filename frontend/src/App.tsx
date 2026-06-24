@@ -6,6 +6,7 @@ import DashboardPage from "./pages/DashboardPage";
 import NuevoEncargoPage from "./pages/NuevoEncargoPage";
 import EncargosPage from "./pages/EncargosPage";
 import MensajesProveedores from "./pages/MensajesProveedores";
+import InventarioPage from "./pages/InventarioPage";
 
 import "./App.css";
 
@@ -67,6 +68,17 @@ function App() {
           element={
             logueado ? (
               <MensajesProveedores />
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+
+        <Route
+          path="/dashboard/inventario"
+          element={
+            logueado ? (
+              <InventarioPage />
             ) : (
               <Navigate to="/login" />
             )

@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, PlusCircle, List, MessageSquare } from "lucide-react";
+import { LayoutDashboard, PlusCircle, List, MessageSquare, Package } from "lucide-react";
 import clsx from "clsx";
 import logo from "../assets/logo-header.png";
 
@@ -9,6 +9,7 @@ function Sidebar() {
     { to: "/dashboard/nuevo", icon: PlusCircle, label: "Nuevo Encargo" },
     { to: "/dashboard/encargos", icon: List, label: "Ver Encargos" },
     { to: "/dashboard/mensajes", icon: MessageSquare, label: "Mensajes" },
+    { to: "/dashboard/inventario", icon: Package, label: "Inventario" },
   ];
 
   return (

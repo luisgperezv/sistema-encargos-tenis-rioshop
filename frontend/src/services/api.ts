@@ -299,3 +299,114 @@ export const enviarMensajeProveedorRequest = async (telefono: string, contenido:
 
   return res.json();
 };
+
+export const listarInventarioRequest = async (params?: {
+  buscar?: string;
+  marca?: string;
+  estado?: string;
+  talla_eur?: string;
+  talla_col?: string;
+}) => {
+  const token = localStorage.getItem("token");
+  const queryParams = new URLSearchParams();
+
+  if (params) {
+    if (params.buscar) queryParams.append("buscar", params.buscar);
+    if (params.marca) queryParams.append("marca", params.marca);
+    if (params.estado) queryParams.append("estado", params.estado);
+    if (params.talla_eur) queryParams.append("talla_eur", params.talla_eur);
+    if (params.talla_col) queryParams.append("talla_col", params.talla_col);
+  }
+
+  const res = await fetch(`${API_URL}/inventario?${queryParams.toString()}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return res.json();
+};
+
+export const obtenerItemInventarioRequest = async (id: number) => {
+  const token = localStorage.getItem("token");
+
+  const res = await fetch(`${API_URL}/inventario/${id}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return res.json();
+};
+
+export const crearItemInventarioRequest = async (data: {
+  marca: string;
+  referencia: string;
+  talla_eur: string;
+  talla_col: string;
+  foto?: string | null;
+  costo: number;
+  precio_sugerido: number;
+  cantidad: number;
+  estado: string;
+  fecha_ingreso: string;
+  observaciones?: string | null;
+}) => {
+  const token = localStorage.getItem("token");
+
+  const res = await fetch(`${API_URL}/inventario`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+
+  return res.json();
+};
+
+export const actualizarItemInventarioRequest = async (
+  id: number,
+  data: {
+    marca?: string;
+    referencia?: string;
+    talla_eur?: string;
+    talla_col?: string;
+    foto?: string | null;
+    costo?: number;
+    precio_sugerido?: number;
+    cantidad?: number;
+    estado?: string;
+    fecha_ingreso?: string;
+    observaciones?: string | null;
+  }
+) => {
+  const token = localStorage.getItem("token");
+
+  const res = await fetch(`${API_URL}/inventario/${id}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+
+  return res.json();
+};
+
+export const eliminarItemInventarioRequest = async (id: number) => {
+  const token = localStorage.getItem("token");
+
+  const res = await fetch(`${API_URL}/inventario/${id}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return res.json();
+};
