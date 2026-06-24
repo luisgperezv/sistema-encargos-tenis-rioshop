@@ -6,12 +6,14 @@ from app.models import encargo
 from app.models import proveedor
 from app.models import mensaje_proveedor
 from app.models import venta
+from app.models import inventario
 
 from app.routes import cliente as cliente_router
 from app.routes import encargo as encargo_router
 from app.routes import proveedor as proveedor_router
 from app.routes import mensaje_proveedor as mensaje_proveedor_router
 from app.routes import venta as venta_router
+from app.routes import inventario as inventario_router
 
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -120,6 +122,21 @@ def ejecutar_migraciones_ligeras():
             logging.warning(
                 f"[MIGRACIÓN WARNING] No se pudo crear la tabla ventas automáticamente: {str(create_err)}."
             )
+
+    # 4. Verificar/crear tabla inventario
+    try:
+        db.execute(text("SELECT id FROM inventario LIMIT 1"))
+        print("[MIGRACIÓN] La tabla inventario ya existe.", flush=True)
+    except Exception:
+        db.rollback()
+        print("[MIGRACIÓN] La tabla inventario no existe. Creándola...", flush=True)
+        try:
+            Base.metadata.create_all(bind=engine)
+            print("[MIGRACIÓN] Tabla inventario creada correctamente.", flush=True)
+        except Exception as create_err:
+            logging.warning(
+                f"[MIGRACIÓN WARNING] No se pudo crear la tabla inventario automáticamente: {str(create_err)}."
+            )
                 
     db.close()
 
@@ -151,6 +168,7 @@ app.include_router(proveedor_router.router)
 app.include_router(mensaje_proveedor_router.router)
 app.include_router(auth_router.router)
 app.include_router(venta_router.router)
+app.include_router(inventario_router.router)
 
 
 @app.get("/")
