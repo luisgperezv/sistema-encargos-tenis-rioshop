@@ -6,23 +6,41 @@ import {
   eliminarItemInventarioRequest,
   subirImagenRequest,
 } from "../services/api";
-import { PlusCircle, Edit, Trash2, Search, Image as ImageIcon } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Search, Image as ImageIcon, Plus } from "lucide-react";
 import "./Inventario.css";
+
+type TallaInventario = {
+  id: number;
+  inventario_id: number;
+  talla_eur: string;
+  talla_col: string;
+  cantidad: number;
+  fecha_registro: string;
+};
 
 type ArticuloInventario = {
   id: number;
   marca: string;
   referencia: string;
-  talla_eur: string;
-  talla_col: string;
+  talla_eur?: string;
+  talla_col?: string;
   foto: string | null;
   costo: number;
   precio_sugerido: number;
-  cantidad: number;
+  cantidad?: number;
+  cantidad_total: number;
   estado: "disponible" | "agotado" | "reservado";
   fecha_ingreso: string;
   observaciones: string | null;
   fecha_registro: string;
+  tallas: TallaInventario[];
+};
+
+type TallaFormItem = {
+  key: string;
+  talla_eur: string;
+  talla_col: string;
+  cantidad: number;
 };
 
 const formatearPesos = (valor: number) => {
@@ -31,6 +49,49 @@ const formatearPesos = (valor: number) => {
     currency: "COP",
     maximumFractionDigits: 0,
   }).format(valor);
+};
+
+const MAPPING_TALLAS: Record<string, string> = {
+  "36": "35",
+  "37": "36",
+  "38": "37",
+  "39": "38",
+  "40 dama": "39",
+  "40 hombre": "38",
+  "41 dama": "40",
+  "41 hombre": "39",
+  "42": "40",
+  "43": "41",
+  "44": "42",
+  "45": "43",
+};
+
+const OPCIONES_TALLA_EUR = Object.keys(MAPPING_TALLAS);
+
+const ORDEN_TALLAS = [
+  "36",
+  "37",
+  "38",
+  "39",
+  "40 dama",
+  "40 hombre",
+  "41 dama",
+  "41 hombre",
+  "42",
+  "43",
+  "44",
+  "45",
+];
+
+const ordenarTallas = (tallas: TallaInventario[]) => {
+  return [...tallas].sort((a, b) => {
+    const idxA = ORDEN_TALLAS.indexOf(a.talla_eur);
+    const idxB = ORDEN_TALLAS.indexOf(b.talla_eur);
+    if (idxA === -1 && idxB === -1) return 0;
+    if (idxA === -1) return 1;
+    if (idxB === -1) return -1;
+    return idxA - idxB;
+  });
 };
 
 const comprimirImagen = (file: File): Promise<Blob> => {
@@ -103,17 +164,15 @@ function Inventario() {
   // Formulario
   const [marcaInput, setMarcaInput] = useState("");
   const [referenciaInput, setReferenciaInput] = useState("");
-  const [tallaEurInput, setTallaEurInput] = useState("");
-  const [tallaColInput, setTallaColInput] = useState("");
   const [fotoInput, setFotoInput] = useState("");
   const [costoInput, setCostoInput] = useState("");
   const [precioSugeridoInput, setPrecioSugeridoInput] = useState("");
-  const [cantidadInput, setCantidadInput] = useState("1");
   const [estadoInput, setEstadoInput] = useState("disponible");
   const [fechaIngresoInput, setFechaIngresoInput] = useState(
     new Date().toISOString().split("T")[0]
   );
   const [observacionesInput, setObservacionesInput] = useState("");
+  const [tallasInput, setTallasInput] = useState<TallaFormItem[]>([]);
 
   // Errores del formulario
   const [errorForm, setErrorForm] = useState("");
@@ -152,18 +211,23 @@ function Inventario() {
     setArticuloEditando(null);
     setMarcaInput("");
     setReferenciaInput("");
-    setTallaEurInput("");
-    setTallaColInput("");
     setFotoInput("");
     setImagenSeleccionada(null);
     setImagePreview("");
     setCostoInput("");
     setPrecioSugeridoInput("");
-    setCantidadInput("1");
     setEstadoInput("disponible");
     setFechaIngresoInput(new Date().toISOString().split("T")[0]);
     setObservacionesInput("");
     setErrorForm("");
+    setTallasInput([
+      {
+        key: `${Date.now()}-${Math.random()}`,
+        talla_eur: "38",
+        talla_col: "37",
+        cantidad: 1,
+      },
+    ]);
     setShowFormModal(true);
   };
 
@@ -171,19 +235,81 @@ function Inventario() {
     setArticuloEditando(item);
     setMarcaInput(item.marca);
     setReferenciaInput(item.referencia);
-    setTallaEurInput(item.talla_eur);
-    setTallaColInput(item.talla_col);
     setFotoInput(item.foto || "");
     setImagenSeleccionada(null);
     setImagePreview(item.foto || "");
     setCostoInput(String(item.costo));
     setPrecioSugeridoInput(String(item.precio_sugerido));
-    setCantidadInput(String(item.cantidad));
     setEstadoInput(item.estado);
     setFechaIngresoInput(item.fecha_ingreso);
     setObservacionesInput(item.observaciones || "");
     setErrorForm("");
+
+    if (item.tallas && item.tallas.length > 0) {
+      setTallasInput(
+        item.tallas.map((t) => ({
+          key: `${t.id}-${Math.random()}`,
+          talla_eur: t.talla_eur,
+          talla_col: t.talla_col,
+          cantidad: t.cantidad,
+        }))
+      );
+    } else {
+      setTallasInput([
+        {
+          key: `${Date.now()}-${Math.random()}`,
+          talla_eur: item.talla_eur || "38",
+          talla_col: item.talla_col || "37",
+          cantidad: item.cantidad ?? 1,
+        },
+      ]);
+    }
     setShowFormModal(true);
+  };
+
+  const agregarFilaTalla = () => {
+    const yaAgregadas = tallasInput.map((t) => t.talla_eur);
+    const primeraDisponible =
+      OPCIONES_TALLA_EUR.find((size) => !yaAgregadas.includes(size)) || "38";
+    const colAuto = MAPPING_TALLAS[primeraDisponible] || "37";
+
+    setTallasInput((prev) => [
+      ...prev,
+      {
+        key: `${Date.now()}-${Math.random()}`,
+        talla_eur: primeraDisponible,
+        talla_col: colAuto,
+        cantidad: 1,
+      },
+    ]);
+  };
+
+  const eliminarFilaTalla = (key: string) => {
+    setTallasInput((prev) => prev.filter((t) => t.key !== key));
+  };
+
+  const handleTallaEurChange = (key: string, val: string) => {
+    setTallasInput((prev) =>
+      prev.map((t) => {
+        if (t.key === key) {
+          const colAuto = MAPPING_TALLAS[val] || "";
+          return { ...t, talla_eur: val, talla_col: colAuto };
+        }
+        return t;
+      })
+    );
+  };
+
+  const handleTallaCantidadChange = (key: string, valor: string) => {
+    setTallasInput((prev) =>
+      prev.map((t) => {
+        if (t.key === key) {
+          const num = parseInt(valor, 10);
+          return { ...t, cantidad: isNaN(num) ? 0 : num };
+        }
+        return t;
+      })
+    );
   };
 
   const guardarArticulo = async (e: React.FormEvent) => {
@@ -193,16 +319,32 @@ function Inventario() {
     // Validaciones
     if (!marcaInput.trim()) return setErrorForm("La marca es obligatoria.");
     if (!referenciaInput.trim()) return setErrorForm("La referencia es obligatoria.");
-    if (!tallaEurInput.trim()) return setErrorForm("La talla EUR es obligatoria.");
-    if (!tallaColInput.trim()) return setErrorForm("La talla COL es obligatoria.");
-    
+
+    if (tallasInput.length === 0) {
+      return setErrorForm("Debe agregar al menos una talla.");
+    }
+
+    const eurTallas = tallasInput.map((t) => t.talla_eur);
+    const tieneDuplicados = eurTallas.some((val, i) => eurTallas.indexOf(val) !== i);
+    if (tieneDuplicados) {
+      return setErrorForm("No se permiten tallas EUR duplicadas en el mismo producto.");
+    }
+
+    for (let i = 0; i < tallasInput.length; i++) {
+      const t = tallasInput[i];
+      if (!t.talla_eur) {
+        return setErrorForm(`Fila ${i + 1}: La talla EUR es obligatoria.`);
+      }
+      if (t.cantidad < 0) {
+        return setErrorForm(`Fila ${i + 1}: La cantidad debe ser mayor o igual a 0.`);
+      }
+    }
+
     const costo = Number(costoInput);
     const precio = Number(precioSugeridoInput);
-    const cantidad = Number(cantidadInput);
 
     if (isNaN(costo) || costo < 0) return setErrorForm("El costo debe ser mayor o igual a 0.");
     if (isNaN(precio) || precio < 0) return setErrorForm("El precio sugerido debe ser mayor o igual a 0.");
-    if (isNaN(cantidad) || cantidad < 0) return setErrorForm("La cantidad debe ser mayor o igual a 0.");
     if (!fechaIngresoInput) return setErrorForm("La fecha de ingreso es obligatoria.");
 
     let rutaFoto = fotoInput.trim() || null;
@@ -238,15 +380,16 @@ function Inventario() {
       const body = {
         marca: marcaInput.trim(),
         referencia: referenciaInput.trim(),
-        talla_eur: tallaEurInput.trim(),
-        talla_col: tallaColInput.trim(),
         foto: rutaFoto,
         costo,
         precio_sugerido: precio,
-        cantidad,
         estado: estadoInput,
         fecha_ingreso: fechaIngresoInput,
         observaciones: observacionesInput.trim() || null,
+        tallas: tallasInput.map((t) => ({
+          talla_eur: t.talla_eur,
+          cantidad: t.cantidad,
+        })),
       };
 
       let respuesta;
@@ -382,8 +525,26 @@ function Inventario() {
                   <h3 className="card-referencia">{item.referencia}</h3>
 
                   <div className="card-tallas">
-                    <div className="talla-badge">EUR: {item.talla_eur}</div>
-                    <div className="talla-badge">COL: {item.talla_col}</div>
+                    {item.tallas && item.tallas.length > 0 ? (
+                      ordenarTallas(item.tallas).map((t) => (
+                        <div
+                          key={t.id}
+                          className={`talla-badge ${t.cantidad === 0 ? "talla-agotada" : ""}`}
+                        >
+                          {t.talla_eur} / COL {t.talla_col}: {t.cantidad} und.
+                        </div>
+                      ))
+                    ) : (
+                      <>
+                        {item.talla_eur && (
+                          <div
+                            className={`talla-badge ${(item.cantidad ?? 0) === 0 ? "talla-agotada" : ""}`}
+                          >
+                            {item.talla_eur} / COL {item.talla_col || "36"}: {item.cantidad ?? 0} und.
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
 
                   <div className="card-desglose-financiero">
@@ -393,11 +554,15 @@ function Inventario() {
                     </div>
                     <div className="finanza-item">
                       <span className="finanza-lbl">Precio Sugerido</span>
-                      <span className="finanza-val val-precio">{formatearPesos(item.precio_sugerido)}</span>
+                      <span className="finanza-val val-precio">
+                        {formatearPesos(item.precio_sugerido)}
+                      </span>
                     </div>
                     <div className="finanza-item">
                       <span className="finanza-lbl">Utilidad</span>
-                      <span className={`finanza-val val-utilidad ${utilidad >= 0 ? "utilidad-positiva" : "utilidad-negativa"}`}>
+                      <span
+                        className={`finanza-val val-utilidad ${utilidad >= 0 ? "utilidad-positiva" : "utilidad-negativa"}`}
+                      >
                         {formatearPesos(utilidad)}
                       </span>
                     </div>
@@ -406,7 +571,9 @@ function Inventario() {
                   <div className="card-meta">
                     <div className="meta-item">
                       <span className="meta-lbl">Disponibles</span>
-                      <span className="meta-val val-cantidad">{item.cantidad} und.</span>
+                      <span className="meta-val val-cantidad">
+                        {item.cantidad_total !== undefined ? item.cantidad_total : (item.cantidad ?? 0)} und.
+                      </span>
                     </div>
                     <div className="meta-item">
                       <span className="meta-lbl">Ingreso</span>
@@ -478,28 +645,6 @@ function Inventario() {
                 </div>
 
                 <div className="form-group">
-                  <label>Talla EUR *</label>
-                  <input
-                    type="text"
-                    placeholder="Ej: 40"
-                    value={tallaEurInput}
-                    onChange={(e) => setTallaEurInput(e.target.value)}
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Talla COL *</label>
-                  <input
-                    type="text"
-                    placeholder="Ej: 38"
-                    value={tallaColInput}
-                    onChange={(e) => setTallaColInput(e.target.value)}
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
                   <label>Costo *</label>
                   <input
                     type="number"
@@ -517,17 +662,6 @@ function Inventario() {
                     placeholder="Ej: 220000"
                     value={precioSugeridoInput}
                     onChange={(e) => setPrecioSugeridoInput(e.target.value)}
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Cantidad *</label>
-                  <input
-                    type="number"
-                    placeholder="Ej: 5"
-                    value={cantidadInput}
-                    onChange={(e) => setCantidadInput(e.target.value)}
                     required
                   />
                 </div>
@@ -551,6 +685,7 @@ function Inventario() {
                   />
                 </div>
 
+                {/* Sección de Foto */}
                 <div className="form-group full-width form-group-foto">
                   <label>Foto del Producto</label>
                   <div className="foto-input-container">
@@ -578,7 +713,7 @@ function Inventario() {
                       <span className="file-name-label">{imagenSeleccionada.name}</span>
                     )}
                   </div>
-                  
+
                   {imagePreview && (
                     <div className="image-preview-wrapper">
                       <img src={imagePreview} alt="Preview" className="image-preview" />
@@ -595,24 +730,75 @@ function Inventario() {
                       </button>
                     </div>
                   )}
+                </div>
 
-                  <details className="details-url-manual">
-                    <summary>Opciones avanzadas (URL manual de foto)</summary>
-                    <div className="form-group" style={{ marginTop: "0.5rem" }}>
-                      <label>Pegar URL manual de imagen</label>
-                      <input
-                        type="text"
-                        placeholder="Ej: https://cloudinary.com/mi-imagen.jpg"
-                        value={fotoInput}
-                        onChange={(e) => {
-                          setFotoInput(e.target.value);
-                          if (!imagenSeleccionada) {
-                            setImagePreview(e.target.value);
-                          }
-                        }}
-                      />
-                    </div>
-                  </details>
+                {/* Sección de Tallas Disponibles */}
+                <div className="form-group full-width tallas-seccion">
+                  <div className="tallas-header">
+                    <label>Tallas disponibles *</label>
+                    <button
+                      type="button"
+                      className="btn-agregar-talla"
+                      onClick={agregarFilaTalla}
+                    >
+                      <Plus size={16} />
+                      <span>Agregar talla</span>
+                    </button>
+                  </div>
+
+                  <div className="tallas-lista">
+                    {tallasInput.map((talla) => (
+                      <div key={talla.key} className="talla-fila">
+                        <div className="talla-campo">
+                          <label>EUR</label>
+                          <select
+                            value={talla.talla_eur}
+                            onChange={(e) => handleTallaEurChange(talla.key, e.target.value)}
+                          >
+                            {OPCIONES_TALLA_EUR.map((size) => (
+                              <option key={size} value={size}>
+                                {size}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="talla-campo">
+                          <label>COL (Auto)</label>
+                          <input
+                            type="text"
+                            value={talla.talla_col}
+                            readOnly
+                            disabled
+                            className="talla-col-readonly"
+                          />
+                        </div>
+
+                        <div className="talla-campo">
+                          <label>Cantidad</label>
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="Ej: 1"
+                            value={talla.cantidad}
+                            onChange={(e) =>
+                              handleTallaCantidadChange(talla.key, e.target.value)
+                            }
+                            required
+                          />
+                        </div>
+
+                        <button
+                          type="button"
+                          className="btn-eliminar-talla"
+                          onClick={() => eliminarFilaTalla(talla.key)}
+                          title="Eliminar talla"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="form-group full-width">
@@ -626,7 +812,11 @@ function Inventario() {
               </div>
 
               <div className="modal-footer">
-                <button type="button" className="btn-secundario" onClick={() => setShowFormModal(false)}>
+                <button
+                  type="button"
+                  className="btn-secundario"
+                  onClick={() => setShowFormModal(false)}
+                >
                   Cancelar
                 </button>
                 <button type="submit" className="btn-primario" disabled={cargando}>
@@ -642,3 +832,4 @@ function Inventario() {
 }
 
 export default Inventario;
+

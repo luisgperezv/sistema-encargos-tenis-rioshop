@@ -7,6 +7,7 @@ from app.models import proveedor
 from app.models import mensaje_proveedor
 from app.models import venta
 from app.models import inventario
+from app.models import inventario_talla
 
 from app.routes import cliente as cliente_router
 from app.routes import encargo as encargo_router
@@ -137,6 +138,53 @@ def ejecutar_migraciones_ligeras():
             logging.warning(
                 f"[MIGRACIÓN WARNING] No se pudo crear la tabla inventario automáticamente: {str(create_err)}."
             )
+            
+    # 5. Verificar/crear tabla inventario_tallas y realizar backfill
+    try:
+        db.execute(text("SELECT id FROM inventario_tallas LIMIT 1"))
+        print("[MIGRACIÓN] La tabla inventario_tallas ya existe.", flush=True)
+    except Exception:
+        db.rollback()
+        print("[MIGRACIÓN] La tabla inventario_tallas no existe. Creándola...", flush=True)
+        try:
+            Base.metadata.create_all(bind=engine)
+            print("[MIGRACIÓN] Tabla inventario_tallas creada correctamente.", flush=True)
+        except Exception as create_err:
+            logging.warning(
+                f"[MIGRACIÓN WARNING] No se pudo crear la tabla inventario_tallas automáticamente: {str(create_err)}."
+            )
+
+    # Backfill para productos antiguos de inventario
+    try:
+        from app.models.inventario import Inventario
+        from app.models.inventario_talla import InventarioTalla
+        
+        productos = db.query(Inventario).all()
+        migrados = 0
+        for p in productos:
+            # Si el producto no tiene ninguna talla en inventario_tallas
+            tallas_existentes = db.query(InventarioTalla).filter(InventarioTalla.inventario_id == p.id).first()
+            if not tallas_existentes:
+                t_eur = p.talla_eur or "38"
+                t_col = p.talla_col or "36"
+                cant = p.cantidad if p.cantidad is not None else 0
+                
+                nueva_talla = InventarioTalla(
+                    inventario_id=p.id,
+                    talla_eur=t_eur,
+                    talla_col=t_col,
+                    cantidad=cant
+                )
+                db.add(nueva_talla)
+                migrados += 1
+        if migrados > 0:
+            db.commit()
+            print(f"[MIGRACIÓN] Se crearon automáticamente {migrados} tallas para productos antiguos.", flush=True)
+        else:
+            print("[MIGRACIÓN] No se requirió backfill de tallas.", flush=True)
+    except Exception as backfill_err:
+        db.rollback()
+        logging.warning(f"[MIGRACIÓN WARNING] Error en el backfill de inventario_tallas: {str(backfill_err)}")
                 
     db.close()
 

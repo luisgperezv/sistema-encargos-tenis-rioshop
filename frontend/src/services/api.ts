@@ -341,18 +341,24 @@ export const obtenerItemInventarioRequest = async (id: number) => {
   return res.json();
 };
 
+export type TallaInventarioInput = {
+  talla_eur: string;
+  cantidad: number;
+};
+
 export const crearItemInventarioRequest = async (data: {
   marca: string;
   referencia: string;
-  talla_eur: string;
-  talla_col: string;
+  talla_eur?: string;
+  talla_col?: string;
   foto?: string | null;
   costo: number;
   precio_sugerido: number;
-  cantidad: number;
+  cantidad?: number;
   estado: string;
   fecha_ingreso: string;
   observaciones?: string | null;
+  tallas: TallaInventarioInput[];
 }) => {
   const token = localStorage.getItem("token");
 
@@ -382,6 +388,7 @@ export const actualizarItemInventarioRequest = async (
     estado?: string;
     fecha_ingreso?: string;
     observaciones?: string | null;
+    tallas?: TallaInventarioInput[];
   }
 ) => {
   const token = localStorage.getItem("token");

@@ -4,9 +4,50 @@ from sqlalchemy import or_
 from app.core.security import get_current_user
 from app.database import get_db
 from app.models.inventario import Inventario
-from app.schemas.inventario import InventarioCreate, InventarioUpdate, InventarioResponse
+from app.models.inventario_talla import InventarioTalla
+from app.schemas.inventario import (
+    InventarioCreate,
+    InventarioUpdate,
+    InventarioResponse,
+    MAPPING_TALLAS,
+)
 
 router = APIRouter()
+
+
+def actualizar_estado_y_campos_compatibilidad(
+    item: Inventario, estado_solicitado: str | None = None
+):
+    """
+    Calcula el estado general del producto y actualiza los campos antiguos
+    (talla_eur, talla_col, cantidad) para mantener compatibilidad en producción.
+    """
+    if item.tallas:
+        todas_cero = all(t.cantidad == 0 for t in item.tallas)
+        if todas_cero:
+            item.estado = "agotado"
+        else:
+            # Si el usuario solicitó un estado explícito, lo usamos.
+            # De lo contrario, si el producto ya está en reservado, lo respetamos.
+            # En cualquier otro caso, vuelve a disponible.
+            estado_final = estado_solicitado or item.estado
+            if estado_final == "reservado":
+                item.estado = "reservado"
+            else:
+                item.estado = "disponible"
+
+        # Sincronizar campos antiguos con la primera talla de la lista para compatibilidad
+        item.talla_eur = item.tallas[0].talla_eur
+        item.talla_col = item.tallas[0].talla_col
+        item.cantidad = sum(t.cantidad for t in item.tallas)
+    else:
+        # Fallback si no tiene tallas
+        if item.cantidad == 0:
+            item.estado = "agotado"
+        elif estado_solicitado and estado_solicitado in ["disponible", "reservado"]:
+            item.estado = estado_solicitado
+        elif item.estado != "reservado":
+            item.estado = "disponible"
 
 
 @router.get("/inventario", response_model=list[InventarioResponse])
@@ -37,11 +78,14 @@ def listar_inventario(
     if estado:
         query = query.filter(Inventario.estado == estado)
 
-    if talla_eur:
-        query = query.filter(Inventario.talla_eur == talla_eur)
-
-    if talla_col:
-        query = query.filter(Inventario.talla_col == talla_col)
+    # Filtrar buscando dentro de la tabla inventario_tallas
+    if talla_eur or talla_col:
+        query = query.join(Inventario.tallas)
+        if talla_eur:
+            query = query.filter(InventarioTalla.talla_eur == talla_eur)
+        if talla_col:
+            query = query.filter(InventarioTalla.talla_col == talla_col)
+        query = query.distinct()
 
     items = query.order_by(Inventario.id.desc()).all()
     return items
@@ -55,7 +99,9 @@ def obtener_item_inventario(
 ):
     item = db.query(Inventario).filter(Inventario.id == inventario_id).first()
     if not item:
-        raise HTTPException(status_code=404, detail="El artículo de inventario no existe")
+        raise HTTPException(
+            status_code=404, detail="El artículo de inventario no existe"
+        )
     return item
 
 
@@ -68,20 +114,29 @@ def crear_item_inventario(
     nuevo_item = Inventario(
         marca=data.marca,
         referencia=data.referencia,
-        talla_eur=data.talla_eur,
-        talla_col=data.talla_col,
         foto=data.foto,
         costo=data.costo,
         precio_sugerido=data.precio_sugerido,
-        cantidad=data.cantidad,
         estado=data.estado,
         fecha_ingreso=data.fecha_ingreso,
         observaciones=data.observaciones,
     )
 
-    # Regla: Si cantidad llega a 0 -> estado="agotado"
-    if nuevo_item.cantidad == 0:
-        nuevo_item.estado = "agotado"
+    # Crear las tallas correspondientes
+    tallas_db = []
+    for t in data.tallas:
+        t_col = MAPPING_TALLAS.get(t.talla_eur, "38")
+        t_db = InventarioTalla(
+            talla_eur=t.talla_eur,
+            talla_col=t_col,
+            cantidad=t.cantidad,
+        )
+        tallas_db.append(t_db)
+
+    nuevo_item.tallas = tallas_db
+
+    # Calcular estados y rellenar columnas heredadas
+    actualizar_estado_y_campos_compatibilidad(nuevo_item, data.estado)
 
     db.add(nuevo_item)
     db.commit()
@@ -98,44 +153,43 @@ def actualizar_item_inventario(
 ):
     item = db.query(Inventario).filter(Inventario.id == inventario_id).first()
     if not item:
-        raise HTTPException(status_code=404, detail="El artículo de inventario no existe")
-
-    old_estado = item.estado
+        raise HTTPException(
+            status_code=404, detail="El artículo de inventario no existe"
+        )
 
     # Actualizar campos recibidos
     if data.marca is not None:
         item.marca = data.marca
     if data.referencia is not None:
         item.referencia = data.referencia
-    if data.talla_eur is not None:
-        item.talla_eur = data.talla_eur
-    if data.talla_col is not None:
-        item.talla_col = data.talla_col
     if data.foto is not None:
         item.foto = data.foto
     if data.costo is not None:
         item.costo = data.costo
     if data.precio_sugerido is not None:
         item.precio_sugerido = data.precio_sugerido
-    if data.cantidad is not None:
-        item.cantidad = data.cantidad
-    if data.estado is not None:
-        item.estado = data.estado
     if data.fecha_ingreso is not None:
         item.fecha_ingreso = data.fecha_ingreso
     if data.observaciones is not None:
         item.observaciones = data.observaciones
 
-    # Regla: Si cantidad llega a 0 -> estado="agotado"
-    # Regla: Si cantidad vuelve a ser >0 y estaba agotado -> estado="disponible"
-    if item.cantidad == 0:
-        item.estado = "agotado"
-    elif item.cantidad > 0 and old_estado == "agotado":
-        # Si se envió un estado explícito válido para cantidad > 0 (ej: reservado), usarlo, sino disponible
-        if data.estado and data.estado != "agotado":
-            item.estado = data.estado
-        else:
-            item.estado = "disponible"
+    # Reemplazar la lista de tallas si se envió
+    if data.tallas is not None:
+        item.tallas.clear()
+
+        tallas_db = []
+        for t in data.tallas:
+            t_col = MAPPING_TALLAS.get(t.talla_eur, "38")
+            t_db = InventarioTalla(
+                talla_eur=t.talla_eur,
+                talla_col=t_col,
+                cantidad=t.cantidad,
+            )
+            tallas_db.append(t_db)
+        item.tallas = tallas_db
+
+    # Calcular estados y rellenar columnas heredadas
+    actualizar_estado_y_campos_compatibilidad(item, data.estado)
 
     db.commit()
     db.refresh(item)
@@ -150,8 +204,11 @@ def eliminar_item_inventario(
 ):
     item = db.query(Inventario).filter(Inventario.id == inventario_id).first()
     if not item:
-        raise HTTPException(status_code=404, detail="El artículo de inventario no existe")
+        raise HTTPException(
+            status_code=404, detail="El artículo de inventario no existe"
+        )
 
     db.delete(item)
     db.commit()
     return {"mensaje": "Artículo eliminado correctamente del inventario"}
+
