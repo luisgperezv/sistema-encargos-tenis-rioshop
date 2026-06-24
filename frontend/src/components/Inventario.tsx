@@ -15,6 +15,8 @@ type TallaInventario = {
   talla_eur: string;
   talla_col: string;
   cantidad: number;
+  
+  esNueva?: boolean;
   fecha_registro: string;
 };
 
@@ -41,6 +43,7 @@ type TallaFormItem = {
   talla_eur: string;
   talla_col: string;
   cantidad: number;
+  esNueva?: boolean;
 };
 
 const formatearPesos = (valor: number) => {
@@ -274,13 +277,14 @@ function Inventario() {
     const colAuto = MAPPING_TALLAS[primeraDisponible] || "37";
 
     setTallasInput((prev) => [
-      ...prev,
       {
-        key: `${Date.now()}-${Math.random()}`,
+        key: `nueva-${Date.now()}-${Math.random()}`,
         talla_eur: primeraDisponible,
         talla_col: colAuto,
         cantidad: 1,
+        esNueva: true,
       },
+      ...prev,
     ]);
   };
 
@@ -748,7 +752,10 @@ function Inventario() {
 
                   <div className="tallas-lista">
                     {tallasInput.map((talla) => (
-                      <div key={talla.key} className="talla-fila">
+                        <div
+                          key={talla.key}
+                          className={`talla-fila ${talla.esNueva ? "talla-fila-nueva" : ""}`}
+                        >
                         <div className="talla-campo">
                           <label>EUR</label>
                           <select
