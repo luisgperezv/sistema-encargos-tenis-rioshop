@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, String
 import shutil
 import os
@@ -252,7 +252,10 @@ def listar_encargos(
     db: Session = Depends(get_db),
     current_user: str = Depends(get_current_user),
 ):
-    query = db.query(Encargo).join(Cliente)
+    import time
+    start_time = time.time()
+
+    query = db.query(Encargo).options(joinedload(Encargo.cliente), joinedload(Encargo.proveedor)).join(Cliente)
 
     if estado:
         query = query.filter(Encargo.estado == estado)
@@ -268,6 +271,8 @@ def listar_encargos(
         )
 
     encargos = query.order_by(Encargo.id.desc()).all()
+    duration = time.time() - start_time
+    print(f"[PERF] GET /encargos tardó {duration:.4f} segundos", flush=True)
     return encargos
 
 
@@ -277,7 +282,12 @@ def obtener_encargo(
     db: Session = Depends(get_db),
     current_user: str = Depends(get_current_user),
 ):
-    encargo = db.query(Encargo).filter(Encargo.id == encargo_id).first()
+    encargo = (
+        db.query(Encargo)
+        .options(joinedload(Encargo.cliente), joinedload(Encargo.proveedor))
+        .filter(Encargo.id == encargo_id)
+        .first()
+    )
 
     if not encargo:
         raise HTTPException(status_code=404, detail="El encargo no existe")
@@ -400,12 +410,12 @@ def actualizar_estado(
     db: Session = Depends(get_db),
     current_user: str = Depends(get_current_user),
 ):
-    print("=== DEBUG DESPACHADO ===")
-    print("data.estado:", data.estado)
-    print("data.costo_base:", data.costo_base)
-    print("data.costo_envio:", data.costo_envio)
-    print("data.costo_despachador:", data.costo_despachador)
-    print("data dict:", data.dict())
+    # print("=== DEBUG DESPACHADO ===")
+    # print("data.estado:", data.estado)
+    # print("data.costo_base:", data.costo_base)
+    # print("data.costo_envio:", data.costo_envio)
+    # print("data.costo_despachador:", data.costo_despachador)
+    # print("data dict:", data.dict())
 
     encargo = db.query(Encargo).filter(Encargo.id == encargo_id).first()
 
@@ -500,11 +510,11 @@ def actualizar_estado(
     if data.estado == "entregado" and estado_anterior != "entregado":
         crear_venta_desde_encargo_si_no_existe(db, encargo)
 
-    print("encargo.costo_base:", encargo.costo_base)
-    print("encargo.costo_envio:", encargo.costo_envio)
-    print("encargo.costo_despachador:", encargo.costo_despachador)
-    print("encargo.costo_total:", encargo.costo_total)
-    print("encargo.utilidad_estimada:", encargo.utilidad_estimada)
+    # print("encargo.costo_base:", encargo.costo_base)
+    # print("encargo.costo_envio:", encargo.costo_envio)
+    # print("encargo.costo_despachador:", encargo.costo_despachador)
+    # print("encargo.costo_total:", encargo.costo_total)
+    # print("encargo.utilidad_estimada:", encargo.utilidad_estimada)
 
     db.commit()
     db.refresh(encargo)
