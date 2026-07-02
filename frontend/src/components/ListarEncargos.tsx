@@ -11,6 +11,56 @@ import {
 
 import "./ListarEncargos.css";
 
+// Mapeo oficial de tallas EUR a COL.
+// Nota sobre nomenclatura: "D" equivale a Dama/Mujer, "H" equivale a Hombre.
+const MAPPING_TALLAS: Record<string, string> = {
+  "28": "27",
+  "29": "28",
+  "30": "29",
+  "31": "30",
+  "32": "31",
+  "33": "32",
+  "34": "33",
+  "35": "34",
+  "36": "35",
+  "37": "36",
+  "38": "37",
+  "39": "38",
+  "40D": "39",
+  "40H": "38",
+  "41D": "40",
+  "41H": "39",
+  "42": "40",
+  "43": "41",
+  "44": "42",
+  "45": "43",
+};
+
+const ORDEN_TALLAS = [
+  "28",
+  "29",
+  "30",
+  "31",
+  "32",
+  "33",
+  "34",
+  "35",
+  "36",
+  "37",
+  "38",
+  "39",
+  "40D",
+  "40H",
+  "41D",
+  "41H",
+  "42",
+  "43",
+  "44",
+  "45",
+];
+
+const OPCIONES_TALLA_EUR = ORDEN_TALLAS;
+
 const colorEstado = (estado: string) => {
   if (estado === "pendiente") return "rgba(239, 68, 68, 0.05)";
   if (estado === "pedido" || estado === "despachado" || estado === "en_local")
@@ -560,19 +610,32 @@ function ListarEncargos() {
                 </div>
 
                 <div>
-                  <label>Talla COL</label>
+                  <label>Talla COL (Auto)</label>
                   <input
                     value={editTallaCol}
-                    onChange={(e) => setEditTallaCol(e.target.value)}
+                    readOnly
+                    disabled
+                    style={{ backgroundColor: "#f3f4f6", cursor: "not-allowed" }}
                   />
                 </div>
 
                 <div>
                   <label>Talla EUR</label>
-                  <input
+                  <select
                     value={editTallaEur}
-                    onChange={(e) => setEditTallaEur(e.target.value)}
-                  />
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setEditTallaEur(val);
+                      setEditTallaCol(MAPPING_TALLAS[val] || "");
+                    }}
+                  >
+                    <option value="">Selecciona talla EUR</option>
+                    {OPCIONES_TALLA_EUR.map((size) => (
+                      <option key={size} value={size}>
+                        {size}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>

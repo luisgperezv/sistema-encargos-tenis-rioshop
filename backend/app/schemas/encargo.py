@@ -3,12 +3,20 @@ from typing import Optional
 
 
 TALLAS_VALIDAS = {
+    "27": ["28"],
+    "28": ["29"],
+    "29": ["30"],
+    "30": ["31"],
+    "31": ["32"],
+    "32": ["33"],
+    "33": ["34"],
+    "34": ["35"],
     "35": ["36"],
     "36": ["37"],
     "37": ["38"],
-    "38": ["39", "40"],
-    "39": ["40", "41"],
-    "40": ["41", "42"],
+    "38": ["39", "40", "40H"],
+    "39": ["40", "41", "40D", "41H"],
+    "40": ["41", "42", "41D"],
     "41": ["43"],
     "42": ["44"],
     "43": ["45"],
@@ -73,8 +81,9 @@ class EncargoCreate(BaseModel):
         if value == "":
             return None
 
-        if not value.isdigit():
-            raise ValueError("La talla europea debe ser numérica")
+        val_clean = value.upper().replace("D", "").replace("H", "")
+        if not val_clean.isdigit():
+            raise ValueError("La talla europea debe ser numérica o tener formato tallaD/tallaH")
 
         return value
 
@@ -144,8 +153,9 @@ class EncargoUpdate(BaseModel):
         if value == "":
             return None
 
-        if not value.isdigit():
-            raise ValueError("La talla europea debe ser numérica")
+        val_clean = value.upper().replace("D", "").replace("H", "")
+        if not val_clean.isdigit():
+            raise ValueError("La talla europea debe ser numérica o tener formato tallaD/tallaH")
 
         return value
 
