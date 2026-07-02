@@ -73,8 +73,6 @@ const MAPPING_TALLAS: Record<string, string> = {
   "45": "43",
 };
 
-const OPCIONES_TALLA_EUR = Object.keys(MAPPING_TALLAS);
-
 const ORDEN_TALLAS = [
   "36",
   "37",
@@ -89,6 +87,8 @@ const ORDEN_TALLAS = [
   "44",
   "45",
 ];
+
+const OPCIONES_TALLA_EUR = ORDEN_TALLAS;
 
 const ordenarTallas = (tallas: TallaInventario[]) => {
   return [...tallas].sort((a, b) => {
