@@ -328,6 +328,32 @@ export const listarInventarioRequest = async (params?: {
   return res.json();
 };
 
+export const obtenerSugerenciasMarcasRequest = async (q: string) => {
+  const token = localStorage.getItem("token");
+  const res = await fetch(`${API_URL}/inventario/sugerencias/marcas?q=${encodeURIComponent(q)}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return res.json();
+};
+
+export const obtenerSugerenciasReferenciasRequest = async (q: string, marca: string) => {
+  const token = localStorage.getItem("token");
+  const res = await fetch(
+    `${API_URL}/inventario/sugerencias/referencias?q=${encodeURIComponent(q)}&marca=${encodeURIComponent(marca)}`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+  return res.json();
+};
+
+
 export const obtenerItemInventarioRequest = async (id: number) => {
   const token = localStorage.getItem("token");
 

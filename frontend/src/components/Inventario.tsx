@@ -5,6 +5,8 @@ import {
   actualizarItemInventarioRequest,
   eliminarItemInventarioRequest,
   subirImagenRequest,
+  obtenerSugerenciasMarcasRequest,
+  obtenerSugerenciasReferenciasRequest,
 } from "../services/api";
 import { PlusCircle, Edit, Trash2, Search, Image as ImageIcon, Plus } from "lucide-react";
 import "./Inventario.css";
@@ -54,15 +56,17 @@ const formatearPesos = (valor: number) => {
   }).format(valor);
 };
 
+// Mapeo oficial de tallas EUR a COL.
+// Nota sobre nomenclatura: "D" equivale a Dama/Mujer, "H" equivale a Hombre.
 const MAPPING_TALLAS: Record<string, string> = {
   "36": "35",
   "37": "36",
   "38": "37",
   "39": "38",
-  "40 dama": "39",
-  "40 hombre": "38",
-  "41 dama": "40",
-  "41 hombre": "39",
+  "40D": "39",
+  "40H": "38",
+  "41D": "40",
+  "41H": "39",
   "42": "40",
   "43": "41",
   "44": "42",
@@ -76,10 +80,10 @@ const ORDEN_TALLAS = [
   "37",
   "38",
   "39",
-  "40 dama",
-  "40 hombre",
-  "41 dama",
-  "41 hombre",
+  "40D",
+  "40H",
+  "41D",
+  "41H",
   "42",
   "43",
   "44",
@@ -181,6 +185,87 @@ function Inventario() {
   const [errorForm, setErrorForm] = useState("");
   const [imagenSeleccionada, setImagenSeleccionada] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
+
+  // Autocompletado y validaciones visuales
+  const [sugerenciasMarcas, setSugerenciasMarcas] = useState<string[]>([]);
+  const [sugerenciasReferencias, setSugerenciasReferencias] = useState<string[]>([]);
+  const [advertenciaDuplicado, setAdvertenciaDuplicado] = useState("");
+
+  const normalizarTexto = (texto: string): string => {
+    if (!texto) return "";
+    return texto
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, " ");
+  };
+
+  // Cargar sugerencias de marcas con debounce
+  useEffect(() => {
+    if (!marcaInput.trim()) {
+      setSugerenciasMarcas([]);
+      return;
+    }
+    const delayDebounceFn = setTimeout(async () => {
+      try {
+        const data = await obtenerSugerenciasMarcasRequest(marcaInput);
+        if (Array.isArray(data)) {
+          setSugerenciasMarcas(data);
+        }
+      } catch (err) {
+        console.error("Error cargando sugerencias de marcas", err);
+      }
+    }, 250);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [marcaInput]);
+
+  // Cargar sugerencias de referencias con debounce
+  useEffect(() => {
+    if (!referenciaInput.trim()) {
+      setSugerenciasReferencias([]);
+      return;
+    }
+    const delayDebounceFn = setTimeout(async () => {
+      try {
+        const data = await obtenerSugerenciasReferenciasRequest(referenciaInput, marcaInput);
+        if (Array.isArray(data)) {
+          setSugerenciasReferencias(data);
+        }
+      } catch (err) {
+        console.error("Error cargando sugerencias de referencias", err);
+      }
+    }, 250);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [referenciaInput, marcaInput]);
+
+  // Validar duplicado visualmente de forma pasiva
+  useEffect(() => {
+    const mNorm = normalizarTexto(marcaInput);
+    const rNorm = normalizarTexto(referenciaInput);
+
+    if (!mNorm || !rNorm) {
+      setAdvertenciaDuplicado("");
+      return;
+    }
+
+    const duplicado = articulos.find(
+      (item) =>
+        item.id !== articuloEditando?.id &&
+        normalizarTexto(item.marca) === mNorm &&
+        normalizarTexto(item.referencia) === rNorm
+    );
+
+    if (duplicado) {
+      setAdvertenciaDuplicado(
+        `⚠️ Nota: Ya existe el producto "${duplicado.marca} - ${duplicado.referencia}" en el inventario.`
+      );
+    } else {
+      setAdvertenciaDuplicado("");
+    }
+  }, [marcaInput, referenciaInput, articulos, articuloEditando]);
 
   const cargarInventario = async () => {
     setCargando(true);
@@ -624,6 +709,20 @@ function Inventario() {
 
             <form onSubmit={guardarArticulo} className="modal-form">
               {errorForm && <div className="error-mensaje">{errorForm}</div>}
+              {advertenciaDuplicado && (
+                <div style={{
+                  color: "#d97706",
+                  backgroundColor: "#fef3c7",
+                  border: "1px solid #fcd34d",
+                  padding: "10px 12px",
+                  borderRadius: "6px",
+                  marginBottom: "15px",
+                  fontSize: "13px",
+                  fontWeight: 500,
+                }}>
+                  {advertenciaDuplicado}
+                </div>
+              )}
 
               <div className="form-grid">
                 <div className="form-group">
@@ -633,8 +732,14 @@ function Inventario() {
                     placeholder="Ej: Nike"
                     value={marcaInput}
                     onChange={(e) => setMarcaInput(e.target.value)}
+                    list="marcas-sugeridas"
                     required
                   />
+                  <datalist id="marcas-sugeridas">
+                    {sugerenciasMarcas.map((marca) => (
+                      <option key={marca} value={marca} />
+                    ))}
+                  </datalist>
                 </div>
 
                 <div className="form-group">
@@ -644,8 +749,14 @@ function Inventario() {
                     placeholder="Ej: Jordan Retro 4"
                     value={referenciaInput}
                     onChange={(e) => setReferenciaInput(e.target.value)}
+                    list="referencias-sugeridas"
                     required
                   />
+                  <datalist id="referencias-sugeridas">
+                    {sugerenciasReferencias.map((ref) => (
+                      <option key={ref} value={ref} />
+                    ))}
+                  </datalist>
                 </div>
 
                 <div className="form-group">

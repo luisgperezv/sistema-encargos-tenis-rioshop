@@ -154,7 +154,30 @@ def ejecutar_migraciones_ligeras():
                 f"[MIGRACIÓN WARNING] No se pudo crear la tabla inventario_tallas automáticamente: {str(create_err)}."
             )
 
-    # Backfill para productos antiguos de inventario
+    # 6. Verificar/crear columnas de normalización para marca y referencia en inventario (antes de hacer queries en Inventario)
+    columnas_inventario = {
+        "marca_normalizada": "VARCHAR",
+        "referencia_normalizada": "VARCHAR"
+    }
+    
+    for col, col_type in columnas_inventario.items():
+        try:
+            db.execute(text(f"SELECT {col} FROM inventario LIMIT 1"))
+            print(f"[MIGRACIÓN] La columna {col} ya existe en la tabla inventario.", flush=True)
+        except Exception:
+            db.rollback()
+            print(f"[MIGRACIÓN] La columna {col} no existe. Intentando agregarla...", flush=True)
+            try:
+                db.execute(text(f"ALTER TABLE inventario ADD COLUMN {col} {col_type}"))
+                db.commit()
+                print(f"[MIGRACIÓN] Columna {col} añadida exitosamente.", flush=True)
+            except Exception as alter_err:
+                db.rollback()
+                logging.warning(
+                    f"[MIGRACIÓN WARNING] No se pudo agregar la columna {col} automáticamente: {str(alter_err)}."
+                )
+
+    # 7. Backfill para productos antiguos de inventario
     try:
         from app.models.inventario import Inventario
         from app.models.inventario_talla import InventarioTalla
@@ -185,6 +208,83 @@ def ejecutar_migraciones_ligeras():
     except Exception as backfill_err:
         db.rollback()
         logging.warning(f"[MIGRACIÓN WARNING] Error en el backfill de inventario_tallas: {str(backfill_err)}")
+
+    # 7. Realizar backfill de marca_normalizada y referencia_normalizada para registros antiguos
+    try:
+        from app.models.inventario import Inventario
+        from app.services.utils import normalizar_texto
+        from sqlalchemy import or_
+
+        productos_sin_norm = db.query(Inventario).filter(
+            or_(
+                Inventario.marca_normalizada == None,
+                Inventario.referencia_normalizada == None
+            )
+        ).all()
+        
+        if productos_sin_norm:
+            for p in productos_sin_norm:
+                if p.marca_normalizada is None:
+                    p.marca_normalizada = normalizar_texto(p.marca)
+                if p.referencia_normalizada is None:
+                    p.referencia_normalizada = normalizar_texto(p.referencia)
+            db.commit()
+            print(f"[MIGRACIÓN] Se normalizaron marca/referencia para {len(productos_sin_norm)} productos.", flush=True)
+    except Exception as norm_err:
+        db.rollback()
+        logging.warning(f"[MIGRACIÓN WARNING] Error en backfill de normalización: {str(norm_err)}")
+
+    # 8. Migración de etiquetas de tallas viejas a las nuevas en la DB (Verificando primero existencia de columnas)
+    try:
+        from app.models.inventario import Inventario
+        from app.models.inventario_talla import InventarioTalla
+
+        # Mapeo de tallas viejas a nuevas
+        rename_map = {
+            "40 dama": "40D",
+            "40 hombre": "40H",
+            "41 dama": "41D",
+            "41 hombre": "41H"
+        }
+
+        # 8a. Verificar y migrar en inventario_tallas (columna talla_eur)
+        tallas_col_exists = False
+        try:
+            db.execute(text("SELECT talla_eur FROM inventario_tallas LIMIT 1"))
+            tallas_col_exists = True
+        except Exception:
+            db.rollback()
+
+        if tallas_col_exists:
+            tallas_a_migrar = db.query(InventarioTalla).filter(
+                InventarioTalla.talla_eur.in_(list(rename_map.keys()))
+            ).all()
+            if tallas_a_migrar:
+                for t in tallas_a_migrar:
+                    t.talla_eur = rename_map[t.talla_eur]
+                db.commit()
+                print(f"[MIGRACIÓN] Se actualizaron {len(tallas_a_migrar)} registros en inventario_tallas.", flush=True)
+
+        # 8b. Verificar y migrar en inventario (columna talla_eur)
+        inventario_col_exists = False
+        try:
+            db.execute(text("SELECT talla_eur FROM inventario LIMIT 1"))
+            inventario_col_exists = True
+        except Exception:
+            db.rollback()
+
+        if inventario_col_exists:
+            productos_a_migrar = db.query(Inventario).filter(
+                Inventario.talla_eur.in_(list(rename_map.keys()))
+            ).all()
+            if productos_a_migrar:
+                for p in productos_a_migrar:
+                    p.talla_eur = rename_map[p.talla_eur]
+                db.commit()
+                print(f"[MIGRACIÓN] Se actualizaron {len(productos_a_migrar)} registros en inventario.", flush=True)
+    except Exception as label_err:
+        db.rollback()
+        logging.warning(f"[MIGRACIÓN WARNING] Error migrando etiquetas de tallas: {str(label_err)}")
                 
     db.close()
 

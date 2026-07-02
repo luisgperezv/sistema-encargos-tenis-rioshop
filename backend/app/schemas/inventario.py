@@ -2,21 +2,23 @@ from pydantic import BaseModel, field_validator
 from typing import Optional
 from datetime import datetime
 
-# Mapeo oficial de tallas EUR a COL
+# Mapeo oficial de tallas EUR a COL.
+# Nota sobre nomenclatura: "D" equivale a Dama/Mujer, "H" equivale a Hombre.
 MAPPING_TALLAS = {
     "36": "35",
     "37": "36",
     "38": "37",
     "39": "38",
-    "40 dama": "39",
-    "40 hombre": "38",
-    "41 dama": "40",
-    "41 hombre": "39",
+    "40D": "39",
+    "40H": "38",
+    "41D": "40",
+    "41H": "39",
     "42": "40",
     "43": "41",
     "44": "42",
     "45": "43",
 }
+
 
 
 class InventarioTallaBase(BaseModel):

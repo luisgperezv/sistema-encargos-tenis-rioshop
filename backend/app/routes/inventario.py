@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 from app.core.security import get_current_user
 from app.database import get_db
 from app.models.inventario import Inventario
 from app.models.inventario_talla import InventarioTalla
+from app.services.utils import normalizar_texto
 from app.schemas.inventario import (
     InventarioCreate,
     InventarioUpdate,
@@ -91,6 +92,46 @@ def listar_inventario(
     return items
 
 
+@router.get("/inventario/sugerencias/marcas", response_model=list[str])
+def sugerencias_marcas(
+    q: str = Query(""),
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user),
+):
+    q_normalizado = normalizar_texto(q)
+    query = db.query(func.min(Inventario.marca)).filter(
+        Inventario.marca_normalizada != None,
+        Inventario.marca_normalizada != ""
+    )
+    if q_normalizado:
+        query = query.filter(Inventario.marca_normalizada.ilike(f"%{q_normalizado}%"))
+    
+    results = query.group_by(Inventario.marca_normalizada).limit(20).all()
+    return [r[0] for r in results if r[0]]
+
+
+@router.get("/inventario/sugerencias/referencias", response_model=list[str])
+def sugerencias_referencias(
+    q: str = Query(""),
+    marca: str = Query(""),
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user),
+):
+    query = db.query(func.min(Inventario.referencia)).filter(
+        Inventario.referencia_normalizada != None,
+        Inventario.referencia_normalizada != ""
+    )
+    if marca:
+        marca_norm = normalizar_texto(marca)
+        query = query.filter(Inventario.marca_normalizada == marca_norm)
+    if q:
+        q_normalizado = normalizar_texto(q)
+        query = query.filter(Inventario.referencia_normalizada.ilike(f"%{q_normalizado}%"))
+    
+    results = query.group_by(Inventario.referencia_normalizada).limit(20).all()
+    return [r[0] for r in results if r[0]]
+
+
 @router.get("/inventario/{inventario_id}", response_model=InventarioResponse)
 def obtener_item_inventario(
     inventario_id: int,
@@ -111,9 +152,24 @@ def crear_item_inventario(
     db: Session = Depends(get_db),
     current_user: str = Depends(get_current_user),
 ):
+    m_norm = normalizar_texto(data.marca)
+    r_norm = normalizar_texto(data.referencia)
+
+    existente = db.query(Inventario).filter(
+        Inventario.marca_normalizada == m_norm,
+        Inventario.referencia_normalizada == r_norm
+    ).first()
+    if existente:
+        raise HTTPException(
+            status_code=400,
+            detail="Ya existe un producto registrado con esta combinación de Marca y Referencia."
+        )
+
     nuevo_item = Inventario(
         marca=data.marca,
+        marca_normalizada=m_norm,
         referencia=data.referencia,
+        referencia_normalizada=r_norm,
         foto=data.foto,
         costo=data.costo,
         precio_sugerido=data.precio_sugerido,
@@ -157,11 +213,32 @@ def actualizar_item_inventario(
             status_code=404, detail="El artículo de inventario no existe"
         )
 
+    # Validar duplicados excluyendo el producto actual
+    marca_def = data.marca if data.marca is not None else item.marca
+    referencia_def = data.referencia if data.referencia is not None else item.referencia
+    m_norm = normalizar_texto(marca_def)
+    r_norm = normalizar_texto(referencia_def)
+
+    existente = db.query(Inventario).filter(
+        Inventario.marca_normalizada == m_norm,
+        Inventario.referencia_normalizada == r_norm,
+        Inventario.id != inventario_id
+    ).first()
+    if existente:
+        raise HTTPException(
+            status_code=400,
+            detail="Ya existe otro producto registrado con esta combinación de Marca y Referencia."
+        )
+
     # Actualizar campos recibidos
     if data.marca is not None:
         item.marca = data.marca
+    item.marca_normalizada = m_norm
+
     if data.referencia is not None:
         item.referencia = data.referencia
+    item.referencia_normalizada = r_norm
+
     if data.foto is not None:
         item.foto = data.foto
     if data.costo is not None:

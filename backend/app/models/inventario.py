@@ -9,7 +9,9 @@ class Inventario(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     marca = Column(String, nullable=False)
+    marca_normalizada = Column(String, nullable=True, index=True)
     referencia = Column(String, nullable=False)
+    referencia_normalizada = Column(String, nullable=True, index=True)
     talla_eur = Column(String, nullable=True)  # nullable=True para compatibilidad
     talla_col = Column(String, nullable=True)  # nullable=True para compatibilidad
     foto = Column(String, nullable=True)
