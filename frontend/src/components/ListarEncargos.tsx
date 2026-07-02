@@ -614,8 +614,7 @@ function ListarEncargos() {
                   <input
                     value={editTallaCol}
                     readOnly
-                    disabled
-                    style={{ backgroundColor: "#f3f4f6", cursor: "not-allowed" }}
+                    style={{ backgroundColor: "#f3f4f6", color: "#374151", cursor: "not-allowed" }}
                   />
                 </div>
 
