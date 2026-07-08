@@ -86,7 +86,10 @@ def crear_venta_desde_encargo_si_no_existe(db: Session, encargo: Encargo) -> Ven
         utilidad=utilidad,
         metodo_pago=encargo.metodo_pago,
         fecha_venta=encargo.fecha_entregado or str(date.today()),
-        origen="encargo"
+        origen="encargo",
+        cantidad=1,
+        precio_unitario=encargo.precio,
+        subtotal=encargo.precio
     )
 
     db.add(nueva_venta)

@@ -11,9 +11,9 @@ class Venta(Base):
     encargo_id = Column(Integer, ForeignKey("encargos.id"), unique=True, nullable=True, index=True)
 
     # Snapshot del Cliente (inmutable)
-    cliente_id = Column(Integer, nullable=False)
-    cliente_nombre = Column(String, nullable=False)
-    cliente_telefono = Column(String, nullable=False)
+    cliente_id = Column(Integer, nullable=True)
+    cliente_nombre = Column(String, nullable=True)
+    cliente_telefono = Column(String, nullable=True)
 
     # Snapshot del Proveedor (inmutable, opcional)
     proveedor_id = Column(Integer, nullable=True)
@@ -21,24 +21,35 @@ class Venta(Base):
     proveedor_telefono = Column(String, nullable=True)
 
     # Snapshot del Calzado
-    referencia = Column(String, nullable=False)
-    talla_eur = Column(String, nullable=False)
-    talla_col = Column(String, nullable=False)
+    marca = Column(String, nullable=True)
+    referencia = Column(String, nullable=True)
+    talla_eur = Column(String, nullable=True)
+    talla_col = Column(String, nullable=True)
     foto = Column(String, nullable=True)
 
+    # Relaciones con Inventario
+    inventario_id = Column(Integer, ForeignKey("inventario.id"), nullable=True, index=True)
+    inventario_talla_id = Column(Integer, ForeignKey("inventario_tallas.id"), nullable=True, index=True)
+
     # Datos Financieros
-    precio_venta = Column(Float, nullable=False)
-    costo_base = Column(Float, nullable=False)
-    costo_envio = Column(Float, nullable=False)
-    costo_despachador = Column(Float, nullable=False)
-    costo_total = Column(Float, nullable=False)
-    utilidad = Column(Float, nullable=False)
+    cantidad = Column(Integer, default=1, nullable=True)
+    precio_unitario = Column(Float, nullable=True)
+    subtotal = Column(Float, nullable=True)
+    precio_venta = Column(Float, nullable=True)
+    costo_base = Column(Float, nullable=True)
+    costo_envio = Column(Float, nullable=True)
+    costo_despachador = Column(Float, nullable=True)
+    costo_total = Column(Float, nullable=True)
+    utilidad = Column(Float, nullable=True)
 
     # Datos de la Venta
-    metodo_pago = Column(String, nullable=False)
-    fecha_venta = Column(String, nullable=False)  # YYYY-MM-DD
+    metodo_pago = Column(String, nullable=True)
+    fecha_venta = Column(String, nullable=True)  # YYYY-MM-DD
     origen = Column(String, nullable=False, default="encargo")
+    observaciones = Column(String, nullable=True)
     fecha_registro = Column(DateTime, default=datetime.utcnow)
 
-    # Relación de auditoría con la tabla encargos (soporta nulos si se elimina el encargo)
+    # Relación de auditoría (soporta nulos si se elimina el encargo o producto)
     encargo = relationship("Encargo")
+    inventario = relationship("Inventario")
+    inventario_talla = relationship("InventarioTalla")

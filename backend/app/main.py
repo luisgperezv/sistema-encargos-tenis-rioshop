@@ -93,26 +93,50 @@ def ejecutar_migraciones_ligeras():
                     "Es posible que deba agregarse manualmente."
                 )
 
-    # 3. Verificar/crear tabla ventas y columna origen
+    # 3. Verificar/crear tabla ventas y columnas nuevas
     try:
         db.execute(text("SELECT id FROM ventas LIMIT 1"))
         print("[MIGRACIÓN] La tabla ventas ya existe.", flush=True)
-        # Verificar si existe la columna 'origen'
-        try:
-            db.execute(text("SELECT origen FROM ventas LIMIT 1"))
-            print("[MIGRACIÓN] La columna origen ya existe en la tabla ventas.", flush=True)
-        except Exception:
-            db.rollback()
-            print("[MIGRACIÓN] La columna origen no existe en la tabla ventas. Intentando agregarla...", flush=True)
+
+        # Intentar poner las columnas existentes como NULLABLE (para Postgres/Railway)
+        columnas_not_null_a_null = [
+            "cliente_id", "cliente_nombre", "cliente_telefono", "referencia", "talla_eur",
+            "talla_col", "precio_venta", "costo_base", "costo_envio", "costo_despachador",
+            "costo_total", "utilidad", "metodo_pago", "fecha_venta"
+        ]
+        for col in columnas_not_null_a_null:
             try:
-                db.execute(text("ALTER TABLE ventas ADD COLUMN origen VARCHAR NOT NULL DEFAULT 'encargo'"))
+                db.execute(text(f"ALTER TABLE ventas ALTER COLUMN {col} DROP NOT NULL"))
                 db.commit()
-                print("[MIGRACIÓN] Columna origen añadida exitosamente a la tabla ventas.", flush=True)
-            except Exception as col_err:
+            except Exception:
                 db.rollback()
-                logging.warning(
-                    f"[MIGRACIÓN WARNING] No se pudo agregar la columna origen a la tabla ventas: {str(col_err)}."
-                )
+
+        # Agregar nuevas columnas si no existen
+        columnas_nuevas_ventas = {
+            "origen": "VARCHAR NOT NULL DEFAULT 'encargo'",
+            "inventario_id": "INTEGER",
+            "inventario_talla_id": "INTEGER",
+            "marca": "VARCHAR",
+            "cantidad": "INTEGER DEFAULT 1",
+            "precio_unitario": "DOUBLE PRECISION",
+            "subtotal": "DOUBLE PRECISION",
+            "observaciones": "TEXT"
+        }
+        for col, col_type in columnas_nuevas_ventas.items():
+            try:
+                db.execute(text(f"SELECT {col} FROM ventas LIMIT 1"))
+            except Exception:
+                db.rollback()
+                print(f"[MIGRACIÓN] La columna {col} no existe en la tabla ventas. Intentando agregarla...", flush=True)
+                try:
+                    db.execute(text(f"ALTER TABLE ventas ADD COLUMN {col} {col_type}"))
+                    db.commit()
+                    print(f"[MIGRACIÓN] Columna {col} añadida exitosamente a la tabla ventas.", flush=True)
+                except Exception as col_err:
+                    db.rollback()
+                    logging.warning(
+                        f"[MIGRACIÓN WARNING] No se pudo agregar la columna {col} a la tabla ventas: {str(col_err)}."
+                    )
     except Exception:
         db.rollback()
         print("[MIGRACIÓN] La tabla ventas no existe. Creándola con sus restricciones...", flush=True)

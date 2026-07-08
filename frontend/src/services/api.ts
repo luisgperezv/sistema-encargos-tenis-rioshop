@@ -443,3 +443,127 @@ export const eliminarItemInventarioRequest = async (id: number) => {
 
   return res.json();
 };
+
+export interface Venta {
+  id: number;
+  encargo_id?: number | null;
+  inventario_id?: number | null;
+  inventario_talla_id?: number | null;
+  cliente_id?: number | null;
+  cliente_nombre?: string | null;
+  cliente_telefono?: string | null;
+  proveedor_id?: number | null;
+  proveedor_nombre?: string | null;
+  proveedor_telefono?: string | null;
+  marca?: string | null;
+  referencia?: string | null;
+  talla_eur?: string | null;
+  talla_col?: string | null;
+  foto?: string | null;
+  cantidad?: number;
+  precio_unitario?: number | null;
+  subtotal?: number | null;
+  precio_venta?: number | null;
+  costo_base?: number | null;
+  costo_envio?: number | null;
+  costo_despachador?: number | null;
+  costo_total?: number | null;
+  utilidad?: number | null;
+  metodo_pago?: string | null;
+  fecha_venta?: string | null;
+  origen: string;
+  observaciones?: string | null;
+  fecha_registro: string;
+}
+
+export interface ResumenVentas {
+  total_ventas: number;
+  unidades_vendidas: number;
+  ingresos_totales: number;
+  costos_totales: number;
+  utilidad_total: number;
+  ticket_promedio: number;
+  ventas_por_metodo_pago: Record<string, number>;
+  ventas_por_origen: Record<string, number>;
+}
+
+export const registrarVentaDirectaRequest = async (data: {
+  inventario_talla_id: number;
+  cantidad: number;
+  precio_unitario: number;
+  metodo_pago: string;
+  cliente_nombre?: string;
+  cliente_telefono?: string;
+  observaciones?: string;
+}) => {
+  const token = localStorage.getItem("token");
+
+  const res = await fetch(`${API_URL}/ventas/directa`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+
+  return res.json();
+};
+
+export const obtenerVentasRequest = async (params?: {
+  fecha_desde?: string;
+  fecha_hasta?: string;
+  origen?: string;
+  metodo_pago?: string;
+  telefono?: string;
+  marca?: string;
+  referencia?: string;
+  talla_eur?: string;
+}) => {
+  const token = localStorage.getItem("token");
+  const queryParams = new URLSearchParams();
+
+  if (params) {
+    Object.entries(params).forEach(([key, val]) => {
+      if (val) queryParams.append(key, val);
+    });
+  }
+
+  const res = await fetch(`${API_URL}/ventas?${queryParams.toString()}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return res.json();
+};
+
+export const obtenerResumenVentasRequest = async (params?: {
+  fecha_desde?: string;
+  fecha_hasta?: string;
+  origen?: string;
+  metodo_pago?: string;
+  telefono?: string;
+  marca?: string;
+  referencia?: string;
+  talla_eur?: string;
+}) => {
+  const token = localStorage.getItem("token");
+  const queryParams = new URLSearchParams();
+
+  if (params) {
+    Object.entries(params).forEach(([key, val]) => {
+      if (val) queryParams.append(key, val);
+    });
+  }
+
+  const res = await fetch(`${API_URL}/ventas/resumen?${queryParams.toString()}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return res.json();
+};
