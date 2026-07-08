@@ -88,7 +88,11 @@ def listar_inventario(
             query = query.filter(InventarioTalla.talla_col == talla_col)
         query = query.distinct()
 
-    items = query.order_by(Inventario.id.desc()).all()
+    items = query.order_by(
+        Inventario.marca_normalizada.asc(),
+        Inventario.referencia_normalizada.asc(),
+        Inventario.id.desc()
+    ).all()
     return items
 
 
