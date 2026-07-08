@@ -865,3 +865,150 @@
   background: rgba(99, 102, 241, 0.14);
   box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.22);
 }
+
+/* Responsive Design Helpers for Prices */
+.finanza-lbl-precio-desktop {
+  display: inline;
+}
+.finanza-lbl-precio-mobile {
+  display: none;
+}
+
+/* Tablet Layout */
+@media (max-width: 1024px) {
+  .inventario-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.25rem;
+  }
+}
+
+/* Mobile Layout (2 Columns) */
+@media (max-width: 768px) {
+  .inventario-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+  
+  .inventario-card {
+    border-radius: var(--radius-lg);
+  }
+
+  .card-imagen-wrapper {
+    height: 130px;
+  }
+
+  .badge-estado {
+    top: 0.5rem;
+    right: 0.5rem;
+    padding: 0.15rem 0.45rem;
+    font-size: 0.65rem;
+  }
+
+  .card-info {
+    padding: 0.75rem;
+  }
+
+  .card-header-info {
+    margin-bottom: 0.15rem;
+  }
+
+  .card-marca {
+    font-size: 0.7rem;
+  }
+
+  .card-id {
+    font-size: 0.65rem;
+  }
+
+  .card-referencia {
+    font-size: 0.95rem;
+    margin-bottom: 0.5rem;
+    /* Truncar a un máximo de 2 líneas */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    height: 2.6em;
+    line-height: 1.3;
+  }
+
+  .card-tallas {
+    gap: 0.25rem;
+    margin-bottom: 0.5rem;
+    max-height: 65px;
+  }
+
+  .talla-badge {
+    padding: 0.15rem 0.35rem;
+    font-size: 0.65rem;
+  }
+
+  /* Desglose Financiero Compacto */
+  .card-desglose-financiero {
+    padding: 0.5rem;
+    gap: 0.25rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .finanza-item {
+    justify-content: flex-start;
+    gap: 0.35rem;
+    font-size: 0.75rem;
+  }
+
+  .finanza-lbl::after {
+    content: ":";
+  }
+
+  .finanza-lbl-precio-desktop {
+    display: none;
+  }
+
+  .finanza-lbl-precio-mobile {
+    display: inline;
+  }
+
+  /* Meta Data Compacto */
+  .card-meta {
+    padding-top: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .meta-lbl {
+    font-size: 0.6rem;
+  }
+
+  .meta-val {
+    font-size: 0.75rem;
+  }
+
+  .card-observaciones {
+    font-size: 0.75rem;
+    margin-bottom: 0.5rem;
+    -webkit-line-clamp: 1;
+    line-height: 1.3;
+  }
+
+  /* Acciones en Tarjeta Compactas y Verticales */
+  .card-acciones {
+    flex-direction: column;
+    gap: 0.4rem;
+    padding-top: 0.5rem;
+    margin-top: 0.5rem;
+  }
+
+  .btn-accion {
+    width: 100%;
+    height: 2rem;
+    font-size: 0.75rem;
+    padding: 0;
+  }
+}
+
+/* Extremely Small Screens */
+@media (max-width: 350px) {
+  .inventario-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}

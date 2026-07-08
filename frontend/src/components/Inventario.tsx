@@ -642,7 +642,10 @@ function Inventario() {
                       <span className="finanza-val">{formatearPesos(item.costo)}</span>
                     </div>
                     <div className="finanza-item">
-                      <span className="finanza-lbl">Precio Sugerido</span>
+                      <span className="finanza-lbl">
+                        <span className="finanza-lbl-precio-desktop">Precio Sugerido</span>
+                        <span className="finanza-lbl-precio-mobile">Precio</span>
+                      </span>
                       <span className="finanza-val val-precio">
                         {formatearPesos(item.precio_sugerido)}
                       </span>
