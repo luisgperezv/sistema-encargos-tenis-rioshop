@@ -17,6 +17,8 @@ function Header() {
       case "/dashboard/nuevo": return "Nuevo Encargo";
       case "/dashboard/encargos": return "Ver Encargos";
       case "/dashboard/mensajes": return "Mensajes Proveedores";
+      case "/dashboard/pos": return "Punto de Venta (POS)";
+      case "/dashboard/inventario": return "Inventario";
       default: return "Dashboard";
     }
   };

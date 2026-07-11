@@ -7,6 +7,7 @@ import NuevoEncargoPage from "./pages/NuevoEncargoPage";
 import EncargosPage from "./pages/EncargosPage";
 import MensajesProveedores from "./pages/MensajesProveedores";
 import InventarioPage from "./pages/InventarioPage";
+import POSPage from "./pages/POSPage";
 
 import "./App.css";
 
@@ -79,6 +80,17 @@ function App() {
           element={
             logueado ? (
               <InventarioPage />
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+
+        <Route
+          path="/dashboard/pos"
+          element={
+            logueado ? (
+              <POSPage />
             ) : (
               <Navigate to="/login" />
             )

@@ -567,3 +567,61 @@ export const obtenerResumenVentasRequest = async (params?: {
 
   return res.json();
 };
+
+export interface VentaCheckoutItem {
+  inventario_talla_id: number;
+  cantidad: number;
+  precio_unitario: number;
+}
+
+export interface VentaCheckoutCreate {
+  items: VentaCheckoutItem[];
+  metodo_pago: string;
+  cliente_id?: number | null;
+  cliente_nombre?: string | null;
+  cliente_telefono?: string | null;
+  observaciones?: string | null;
+}
+
+export interface VentaOperacion {
+  id: number;
+  numero_venta: string;
+  cliente_id?: number | null;
+  cliente_nombre?: string | null;
+  cliente_telefono?: string | null;
+  metodo_pago: string;
+  total_bruto: number;
+  costo_total: number;
+  utilidad_total: number;
+  cantidad_items: number;
+  origen: string;
+  observaciones?: string | null;
+  fecha_venta: string;
+  fecha_registro: string;
+}
+
+export interface VentaCheckoutResponse {
+  operacion: VentaOperacion;
+  detalles: Venta[];
+  total_bruto: number;
+  costo_total: number;
+  utilidad_total: number;
+  cantidad_items: number;
+}
+
+export const registrarCheckoutVentaRequest = async (
+  data: VentaCheckoutCreate
+): Promise<VentaCheckoutResponse> => {
+  const token = localStorage.getItem("token");
+
+  const res = await fetch(`${API_URL}/ventas/checkout`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+
+  return res.json();
+};
