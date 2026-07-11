@@ -1,6 +1,7 @@
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, Field, field_validator
+from typing import Optional, List
 from datetime import datetime
+from decimal import Decimal
 
 
 class VentaDirectaCreate(BaseModel):
@@ -18,6 +19,7 @@ class VentaResponse(BaseModel):
     encargo_id: Optional[int] = None
     inventario_id: Optional[int] = None
     inventario_talla_id: Optional[int] = None
+    operacion_id: Optional[int] = None
     cliente_id: Optional[int] = None
     cliente_nombre: Optional[str] = None
     cliente_telefono: Optional[str] = None
@@ -46,3 +48,61 @@ class VentaResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class VentaCheckoutItem(BaseModel):
+    inventario_talla_id: int
+    cantidad: int = Field(..., gt=0)
+    precio_unitario: Decimal = Field(..., gt=0)
+
+
+class VentaCheckoutCreate(BaseModel):
+    items: List[VentaCheckoutItem]
+    metodo_pago: str
+    cliente_id: Optional[int] = None
+    cliente_nombre: Optional[str] = None
+    cliente_telefono: Optional[str] = None
+    observaciones: Optional[str] = None
+
+    @field_validator("items")
+    @classmethod
+    def validar_items(cls, value: List[VentaCheckoutItem]):
+        if not value or len(value) == 0:
+            raise ValueError("Debe incluir al menos un ítem para realizar el checkout.")
+        return value
+
+    @field_validator("metodo_pago")
+    @classmethod
+    def validar_metodo_pago(cls, value: str):
+        if not value or not value.strip():
+            raise ValueError("El método de pago es obligatorio.")
+        return value.strip()
+
+
+class VentaOperacionResponse(BaseModel):
+    id: int
+    numero_venta: str
+    cliente_id: Optional[int] = None
+    cliente_nombre: Optional[str] = None
+    cliente_telefono: Optional[str] = None
+    metodo_pago: str
+    total_bruto: Decimal
+    costo_total: Decimal
+    utilidad_total: Decimal
+    cantidad_items: int
+    origen: str
+    observaciones: Optional[str] = None
+    fecha_venta: datetime
+    fecha_registro: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class VentaCheckoutResponse(BaseModel):
+    operacion: VentaOperacionResponse
+    detalles: List[VentaResponse]
+    total_bruto: Decimal
+    costo_total: Decimal
+    utilidad_total: Decimal
+    cantidad_items: int

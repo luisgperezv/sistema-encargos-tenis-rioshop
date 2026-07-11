@@ -8,6 +8,7 @@ from app.models import mensaje_proveedor
 from app.models import venta
 from app.models import inventario
 from app.models import inventario_talla
+from app.models import venta_operacion
 
 from app.routes import cliente as cliente_router
 from app.routes import encargo as encargo_router
@@ -147,6 +148,39 @@ def ejecutar_migraciones_ligeras():
             logging.warning(
                 f"[MIGRACIÓN WARNING] No se pudo crear la tabla ventas automáticamente: {str(create_err)}."
             )
+    # 3b. Verificar/agregar columnas en ventas para POS cabecera-detalle
+    try:
+        db.execute(text("SELECT operacion_id FROM ventas LIMIT 1"))
+        print("[MIGRACIÓN] La columna operacion_id ya existe en la tabla ventas.", flush=True)
+    except Exception:
+        db.rollback()
+        print("[MIGRACIÓN] La columna operacion_id no existe en la tabla ventas. Intentando agregarla...", flush=True)
+        try:
+            db.execute(text("ALTER TABLE ventas ADD COLUMN operacion_id INTEGER REFERENCES venta_operaciones(id)"))
+            db.commit()
+            print("[MIGRACIÓN] Columna operacion_id añadida exitosamente a la tabla ventas.", flush=True)
+        except Exception as col_err:
+            db.rollback()
+            logging.warning(
+                f"[MIGRACIÓN WARNING] No se pudo agregar la columna operacion_id a la tabla ventas: {str(col_err)}."
+            )
+
+    # 3c. Crear índices recomendados para el POS
+    indices = [
+        ("idx_venta_operaciones_numero_venta", "venta_operaciones", "numero_venta"),
+        ("idx_venta_operaciones_fecha_venta", "venta_operaciones", "fecha_venta"),
+        ("idx_venta_operaciones_metodo_pago", "venta_operaciones", "metodo_pago"),
+        ("idx_ventas_operacion_id", "ventas", "operacion_id"),
+        ("idx_ventas_inventario_talla_id", "ventas", "inventario_talla_id")
+    ]
+    for idx_name, table, col in indices:
+        try:
+            db.execute(text(f"CREATE INDEX IF NOT EXISTS {idx_name} ON {table} ({col})"))
+            db.commit()
+            print(f"[MIGRACIÓN] Índice {idx_name} creado o ya existente.", flush=True)
+        except Exception as idx_err:
+            db.rollback()
+            logging.warning(f"[MIGRACIÓN WARNING] No se pudo crear el índice {idx_name}: {str(idx_err)}")
 
     # 4. Verificar/crear tabla inventario
     try:

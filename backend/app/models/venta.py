@@ -30,6 +30,7 @@ class Venta(Base):
     # Relaciones con Inventario
     inventario_id = Column(Integer, ForeignKey("inventario.id"), nullable=True, index=True)
     inventario_talla_id = Column(Integer, ForeignKey("inventario_tallas.id"), nullable=True, index=True)
+    operacion_id = Column(Integer, ForeignKey("venta_operaciones.id"), nullable=True, index=True)
 
     # Datos Financieros
     cantidad = Column(Integer, default=1, nullable=True)
@@ -53,3 +54,4 @@ class Venta(Base):
     encargo = relationship("Encargo")
     inventario = relationship("Inventario")
     inventario_talla = relationship("InventarioTalla")
+    operacion = relationship("VentaOperacion", back_populates="detalles")

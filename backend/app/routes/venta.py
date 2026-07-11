@@ -4,7 +4,9 @@ from sqlalchemy import or_
 from app.core.security import get_current_user
 from app.database import get_db
 from app.models.venta import Venta
-from app.schemas.venta import VentaResponse, VentaDirectaCreate
+from app.models.venta_operacion import VentaOperacion
+from app.schemas.venta import VentaResponse, VentaDirectaCreate, VentaCheckoutCreate, VentaCheckoutResponse, VentaOperacionResponse
+from app.services.ventas import procesar_checkout
 
 
 router = APIRouter()
@@ -72,76 +74,28 @@ def registrar_venta_directa(
     if data.precio_unitario <= 0:
         raise HTTPException(status_code=400, detail="El precio unitario debe ser mayor a 0")
 
-    from app.models.inventario_talla import InventarioTalla
-    from app.models.inventario import Inventario
-    from datetime import date
+    from app.schemas.venta import VentaCheckoutItem
 
-    # Locking de fila para evitar condiciones de carrera (concurrencia)
-    talla_rel = db.query(InventarioTalla).filter(InventarioTalla.id == data.inventario_talla_id).with_for_update().first()
-    if not talla_rel:
-        raise HTTPException(status_code=404, detail="La talla especificada no existe en el inventario")
-
-    if talla_rel.cantidad < data.cantidad:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Stock insuficiente. Disponible: {talla_rel.cantidad}, Solicitado: {data.cantidad}"
-        )
-
-    producto = db.query(Inventario).filter(Inventario.id == talla_rel.inventario_id).first()
-    if not producto:
-        raise HTTPException(status_code=404, detail="El producto de inventario no existe")
-
-    # Restar stock
-    talla_rel.cantidad -= data.cantidad
-
-    # Actualizar estado de inventario si no queda stock
-    stock_restante = sum(t.cantidad for t in producto.tallas)
-    if stock_restante <= 0:
-        producto.estado = "agotado"
-
-    # Calcular importes
-    subtotal = data.precio_unitario * data.cantidad
-    costo_total = (producto.costo or 0.0) * data.cantidad
-    utilidad = subtotal - costo_total
-
-    cliente_nombre = data.cliente_nombre.strip() if data.cliente_nombre and data.cliente_nombre.strip() else "Cliente casual"
-    cliente_telefono = data.cliente_telefono.strip() if data.cliente_telefono and data.cliente_telefono.strip() else None
-
-    nueva_venta = Venta(
-        inventario_id=producto.id,
-        inventario_talla_id=talla_rel.id,
-        cliente_nombre=cliente_nombre,
-        cliente_telefono=cliente_telefono,
-        marca=producto.marca,
-        referencia=producto.referencia,
-        talla_eur=talla_rel.talla_eur,
-        talla_col=talla_rel.talla_col,
-        foto=producto.foto,
+    # Convertir VentaDirectaCreate a VentaCheckoutCreate con un solo item
+    checkout_item = VentaCheckoutItem(
+        inventario_talla_id=data.inventario_talla_id,
         cantidad=data.cantidad,
-        precio_unitario=data.precio_unitario,
-        subtotal=subtotal,
-        precio_venta=subtotal,
-        costo_base=producto.costo or 0.0,
-        costo_envio=0.0,
-        costo_despachador=0.0,
-        costo_total=costo_total,
-        utilidad=utilidad,
+        precio_unitario=data.precio_unitario
+    )
+    checkout_data = VentaCheckoutCreate(
+        items=[checkout_item],
         metodo_pago=data.metodo_pago,
-        fecha_venta=str(date.today()),
-        origen="inventario",
+        cliente_nombre=data.cliente_nombre,
+        cliente_telefono=data.cliente_telefono,
         observaciones=data.observaciones
     )
 
-    db.add(nueva_venta)
-    try:
-        db.commit()
-        db.refresh(nueva_venta)
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error al registrar la venta: {str(e)}")
-
-    # Retornar con fallbacks aplicados
-    return aplicar_fallbacks_venta(nueva_venta)
+    operacion = procesar_checkout(db, checkout_data, origen="inventario")
+    
+    if not operacion.detalles:
+        raise HTTPException(status_code=500, detail="No se pudo registrar la línea de venta.")
+        
+    return aplicar_fallbacks_venta(operacion.detalles[0])
 
 
 @router.get("/ventas", response_model=list[VentaResponse])
@@ -269,6 +223,60 @@ def obtener_resumen_ventas(
         "ticket_promedio": ticket_promedio,
         "ventas_por_metodo_pago": ventas_por_metodo_pago,
         "ventas_por_origen": ventas_por_origen
+    }
+
+
+@router.post("/ventas/checkout", response_model=VentaCheckoutResponse, status_code=201)
+def registrar_venta_checkout(
+    data: VentaCheckoutCreate,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user),
+):
+    try:
+        operacion = procesar_checkout(db, data, origen="inventario")
+        return {
+            "operacion": operacion,
+            "detalles": [aplicar_fallbacks_venta(v) for v in operacion.detalles],
+            "total_bruto": operacion.total_bruto,
+            "costo_total": operacion.costo_total,
+            "utilidad_total": operacion.utilidad_total,
+            "cantidad_items": operacion.cantidad_items
+        }
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/ventas/operaciones", response_model=list[VentaOperacionResponse])
+def listar_operaciones(
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user),
+):
+    operaciones = db.query(VentaOperacion).order_by(
+        VentaOperacion.fecha_venta.desc(),
+        VentaOperacion.id.desc()
+    ).all()
+    return operaciones
+
+
+@router.get("/ventas/operaciones/{operacion_id}", response_model=VentaCheckoutResponse)
+def obtener_operacion(
+    operacion_id: int,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user),
+):
+    operacion = db.query(VentaOperacion).filter(VentaOperacion.id == operacion_id).first()
+    if not operacion:
+        raise HTTPException(status_code=404, detail="La operación de venta no existe")
+    
+    return {
+        "operacion": operacion,
+        "detalles": [aplicar_fallbacks_venta(v) for v in operacion.detalles],
+        "total_bruto": operacion.total_bruto,
+        "costo_total": operacion.costo_total,
+        "utilidad_total": operacion.utilidad_total,
+        "cantidad_items": operacion.cantidad_items
     }
 
 
