@@ -128,6 +128,13 @@ function POS() {
 
   useEffect(() => {
     cargarInventario();
+    
+    // Add class to body for scoped styling of topbar and layout on POS page
+    document.body.classList.add("pos-page-active");
+    
+    return () => {
+      document.body.classList.remove("pos-page-active");
+    };
   }, []);
 
   // Extraer marcas únicas para el filtro de marcas
