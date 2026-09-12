@@ -886,7 +886,7 @@ function ListarEncargos() {
                       </div>
                     </div>
                   ) : (
-                    <div className="acciones-reenvio-grupo" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <div className="acciones-reenvio-grupo">
                       <button
                         className="btn btn-primary"
                         onClick={() => {
@@ -894,13 +894,15 @@ function ListarEncargos() {
                           setProveedorSeleccionadoReenvio("");
                         }}
                       >
-                        📲 Reenviar a proveedor
+                        <span className="btn-text-full">📲 Reenviar a proveedor</span>
+                        <span className="btn-text-mobile">📲 Proveedor</span>
                       </button>
                       <button
                         className="btn btn-secondary"
                         onClick={() => reenviarAlCliente(encargo)}
                       >
-                        💬 Reenviar a cliente
+                        <span className="btn-text-full">💬 Reenviar a cliente</span>
+                        <span className="btn-text-mobile">💬 Cliente</span>
                       </button>
                     </div>
                   ))}

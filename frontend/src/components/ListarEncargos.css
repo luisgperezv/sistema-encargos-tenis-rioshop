@@ -445,6 +445,31 @@
   width: 100%;
 }
 
+.acciones-reenvio-grupo {
+  display: flex;
+  gap: 0.4rem;
+  width: 100%;
+}
+
+.acciones-reenvio-grupo .btn {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-text-full {
+  display: inline;
+}
+
+.btn-text-mobile {
+  display: none;
+}
+
 .columna-imagen {
   display: flex;
   flex-direction: column;
@@ -626,6 +651,102 @@
   
   .acciones-header .btn {
     flex: 1;
+  }
+
+  .btn-text-full {
+    display: none;
+  }
+
+  .btn-text-mobile {
+    display: inline;
+  }
+
+  .card-encargo {
+    padding: 0.75rem;
+    min-width: 0;
+  }
+
+  .card-header h3 {
+    font-size: 0.92rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+
+  .card-persona-info {
+    font-size: 0.73rem;
+    min-width: 0;
+  }
+
+  .card-persona-info p {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+
+  .card-persona-info a {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .abono-input-row {
+    gap: 0.25rem;
+    width: 100%;
+  }
+
+  .abono-input-row input {
+    flex: 1;
+    min-width: 0;
+    height: 1.9rem;
+    font-size: 0.72rem;
+    padding: 0 0.35rem;
+  }
+
+  .abono-input-row button {
+    height: 1.9rem;
+    padding: 0 0.45rem;
+    font-size: 0.7rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .acciones-reenvio-grupo {
+    flex-direction: row;
+    gap: 0.25rem;
+    width: 100%;
+  }
+
+  .acciones-reenvio-grupo .btn {
+    flex: 1;
+    min-width: 0;
+    height: 1.9rem;
+    padding: 0 0.2rem;
+    font-size: 0.7rem;
+    box-sizing: border-box;
+  }
+
+  .card-acciones select {
+    height: 1.9rem;
+    font-size: 0.72rem;
+    padding: 0 0.35rem;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .card-finanzas-grid {
+    padding: 0.25rem;
+    font-size: 0.68rem;
+  }
+
+  .card-finanzas-grid strong {
+    font-size: 0.72rem;
+  }
+
+  .card-fechas-info {
+    font-size: 0.68rem;
   }
 }
 
