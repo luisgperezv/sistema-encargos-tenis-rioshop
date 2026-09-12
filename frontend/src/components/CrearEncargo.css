@@ -204,6 +204,21 @@
   border-radius: var(--radius-md);
   background: var(--bg-card);
   border: 1px solid var(--border-color);
+  white-space: pre-line;
+}
+
+.campo-invalid label {
+  color: #f87171 !important;
+  font-weight: 600;
+}
+
+.campo-invalid input,
+.campo-invalid select,
+.campo-invalid textarea,
+.input-invalid {
+  border-color: #ef4444 !important;
+  background-color: rgba(239, 68, 68, 0.08) !important;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.3) !important;
 }
 
 @media (max-width: 768px) {

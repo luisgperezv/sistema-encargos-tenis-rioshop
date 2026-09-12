@@ -14,7 +14,7 @@ def obtener_headers_whatsapp() -> dict:
 
 
 def normalizar_numero_whatsapp(numero: str) -> str:
-    numero = numero.strip()
+    numero = (numero or "").strip()
     numero = (
         numero.replace(" ", "")
         .replace("-", "")
@@ -29,6 +29,27 @@ def normalizar_numero_whatsapp(numero: str) -> str:
     return f"57{numero}"
 
 
+def validar_y_normalizar_telefono(telefono: str | None) -> str | None:
+    if not telefono or not str(telefono).strip():
+        return None
+    limpio = (
+        str(telefono)
+        .strip()
+        .replace(" ", "")
+        .replace("-", "")
+        .replace("(", "")
+        .replace(")", "")
+        .replace("+", "")
+    )
+    if not limpio.isdigit():
+        return None
+    if not limpio.startswith("57") and len(limpio) == 10:
+        limpio = f"57{limpio}"
+    if len(limpio) < 10 or len(limpio) > 15:
+        return None
+    return limpio
+
+
 def enviar_template_confirmacion_encargo(
     numero: str,
     nombre: str,
@@ -40,6 +61,25 @@ def enviar_template_confirmacion_encargo(
     saldo: str,
     fecha_estimada: str
 ):
+    params_requeridos = {
+        "Número de teléfono": numero,
+        "Nombre": nombre,
+        "Referencia": referencia,
+        "Talla COL": talla_col,
+        "Talla EUR": talla_eur,
+        "Precio": precio,
+        "Abono": abono,
+        "Saldo": saldo,
+        "Fecha estimada": fecha_estimada,
+    }
+    for campo, val in params_requeridos.items():
+        if not val or not str(val).strip():
+            return {
+                "error": {
+                    "message": f"El campo '{campo}' es obligatorio para notificar al cliente por WhatsApp."
+                }
+            }
+
     url = obtener_url_whatsapp()
     headers = obtener_headers_whatsapp()
     numero_formateado = normalizar_numero_whatsapp(numero)
@@ -57,22 +97,29 @@ def enviar_template_confirmacion_encargo(
                 {
                     "type": "body",
                     "parameters": [
-                        {"type": "text", "text": nombre},
-                        {"type": "text", "text": referencia},
-                        {"type": "text", "text": talla_col},
-                        {"type": "text", "text": talla_eur},
-                        {"type": "text", "text": precio},
-                        {"type": "text", "text": abono},
-                        {"type": "text", "text": saldo},
-                        {"type": "text", "text": fecha_estimada},
+                        {"type": "text", "text": str(nombre).strip()},
+                        {"type": "text", "text": str(referencia).strip()},
+                        {"type": "text", "text": str(talla_col).strip()},
+                        {"type": "text", "text": str(talla_eur).strip()},
+                        {"type": "text", "text": str(precio).strip()},
+                        {"type": "text", "text": str(abono).strip()},
+                        {"type": "text", "text": str(saldo).strip()},
+                        {"type": "text", "text": str(fecha_estimada).strip()},
                     ]
                 }
             ]
         }
     }
 
-    response = requests.post(url, headers=headers, json=payload, timeout=30)
-    return response.json()
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=30)
+        res_json = response.json()
+        if response.status_code != 200 or "error" in res_json:
+            print("Error Meta WhatsApp Cliente:", res_json)
+            return res_json if "error" in res_json else {"error": {"message": f"Meta HTTP {response.status_code}: {response.text}"}}
+        return res_json
+    except Exception as e:
+        return {"error": {"message": f"Error enviando mensaje WhatsApp al cliente: {str(e)}"}}
 
 
 def enviar_template_confirmacion_encargo_foto(
@@ -87,6 +134,26 @@ def enviar_template_confirmacion_encargo_foto(
     saldo: str,
     fecha_estimada: str
 ):
+    params_requeridos = {
+        "Número de teléfono": numero,
+        "Imagen del producto": image_url,
+        "Nombre": nombre,
+        "Referencia": referencia,
+        "Talla COL": talla_col,
+        "Talla EUR": talla_eur,
+        "Precio": precio,
+        "Abono": abono,
+        "Saldo": saldo,
+        "Fecha estimada": fecha_estimada,
+    }
+    for campo, val in params_requeridos.items():
+        if not val or not str(val).strip():
+            return {
+                "error": {
+                    "message": f"El campo '{campo}' es obligatorio para notificar al cliente por WhatsApp."
+                }
+            }
+
     url = obtener_url_whatsapp()
     headers = obtener_headers_whatsapp()
     numero_formateado = normalizar_numero_whatsapp(numero)
@@ -107,7 +174,7 @@ def enviar_template_confirmacion_encargo_foto(
                         {
                             "type": "image",
                             "image": {
-                                "link": image_url
+                                "link": str(image_url).strip()
                             }
                         }
                     ]
@@ -115,22 +182,29 @@ def enviar_template_confirmacion_encargo_foto(
                 {
                     "type": "body",
                     "parameters": [
-                        {"type": "text", "text": nombre},
-                        {"type": "text", "text": referencia},
-                        {"type": "text", "text": talla_col},
-                        {"type": "text", "text": talla_eur},
-                        {"type": "text", "text": precio},
-                        {"type": "text", "text": abono},
-                        {"type": "text", "text": saldo},
-                        {"type": "text", "text": fecha_estimada},
+                        {"type": "text", "text": str(nombre).strip()},
+                        {"type": "text", "text": str(referencia).strip()},
+                        {"type": "text", "text": str(talla_col).strip()},
+                        {"type": "text", "text": str(talla_eur).strip()},
+                        {"type": "text", "text": str(precio).strip()},
+                        {"type": "text", "text": str(abono).strip()},
+                        {"type": "text", "text": str(saldo).strip()},
+                        {"type": "text", "text": str(fecha_estimada).strip()},
                     ]
                 }
             ]
         }
     }
 
-    response = requests.post(url, headers=headers, json=payload, timeout=30)
-    return response.json()
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=30)
+        res_json = response.json()
+        if response.status_code != 200 or "error" in res_json:
+            print("Error Meta WhatsApp Cliente Foto:", res_json)
+            return res_json if "error" in res_json else {"error": {"message": f"Meta HTTP {response.status_code}: {response.text}"}}
+        return res_json
+    except Exception as e:
+        return {"error": {"message": f"Error enviando mensaje WhatsApp al cliente: {str(e)}"}}
 
 
 def enviar_template_proveedor_encargo(

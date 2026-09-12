@@ -115,6 +115,13 @@ function CrearEncargo() {
 
   const [mensaje, setMensaje] = useState("");
   const [cargando, setCargando] = useState(false);
+  const [erroresCampos, setErroresCampos] = useState<Record<string, boolean>>({});
+
+  const limpiarError = (campo: string) => {
+    if (erroresCampos[campo]) {
+      setErroresCampos((prev) => ({ ...prev, [campo]: false }));
+    }
+  };
 
   const cargarClientes = async () => {
     const data = await listarClientesRequest();
@@ -145,6 +152,8 @@ function CrearEncargo() {
     setClienteSeleccionado(cliente);
     setNombreCliente(cliente.nombre);
     setTelefonoCliente(cliente.telefono);
+    limpiarError("nombreCliente");
+    limpiarError("telefonoCliente");
   };
 
   const editarClienteSeleccionado = async () => {
@@ -179,33 +188,77 @@ function CrearEncargo() {
     }
   };
 
-  const agregarProductoLista = () => {
+  const validarCamposProductoActual = (): { valido: boolean; errores: Record<string, boolean>; faltantes: string[] } => {
+    const errores: Record<string, boolean> = {};
+    const faltantes: string[] = [];
+
     if (!proveedorSeleccionado) {
-      setMensaje("❌ Debes seleccionar o crear un proveedor antes de agregar el producto");
-      return;
+      errores["proveedor"] = true;
+      faltantes.push("Proveedor");
     }
     if (!referencia.trim()) {
-      setMensaje("❌ Debes escribir una referencia");
-      return;
-    }
-    if (!tallaCol.trim()) {
-      setMensaje("❌ Debes escribir talla COL");
-      return;
+      errores["referencia"] = true;
+      faltantes.push("Referencia del producto");
     }
     if (!tallaEur.trim()) {
-      setMensaje("❌ Debes escribir talla EUR");
-      return;
+      errores["tallaEur"] = true;
+      faltantes.push("Talla EUR");
     }
-    if (!precio || Number(precio) <= 0) {
-      setMensaje("❌ El precio debe ser mayor a 0");
+    if (!tallaCol.trim()) {
+      errores["tallaCol"] = true;
+      faltantes.push("Talla COL");
+    }
+
+    const numPrecio = Number(precio);
+    if (!precio || isNaN(numPrecio) || numPrecio <= 0) {
+      errores["precio"] = true;
+      faltantes.push("Precio (debe ser un número mayor a 0)");
+    }
+
+    const numAbono = Number(abono);
+    if (abono === "" || abono === null || abono === undefined || isNaN(numAbono)) {
+      errores["abono"] = true;
+      faltantes.push("Abono (ingresa 0 o el valor abonado)");
+    } else if (numAbono < 0) {
+      errores["abono"] = true;
+      faltantes.push("Abono no puede ser negativo");
+    } else if (!isNaN(numPrecio) && numPrecio > 0 && numAbono > numPrecio) {
+      errores["abono"] = true;
+      faltantes.push("El abono no puede ser mayor que el precio");
+    }
+
+    if (!fechaEntrega || !fechaEntrega.trim()) {
+      errores["fechaEntrega"] = true;
+      faltantes.push("Fecha estimada de entrega");
+    }
+
+    if (!foto) {
+      errores["foto"] = true;
+      faltantes.push("Foto del producto");
+    }
+
+    return { valido: faltantes.length === 0, errores, faltantes };
+  };
+
+  const agregarProductoLista = () => {
+    const { valido, errores, faltantes } = validarCamposProductoActual();
+    setErroresCampos(errores);
+
+    if (!valido) {
+      setMensaje(`❌ Faltan datos obligatorios para agregar este producto:\n• ${faltantes.join("\n• ")}`);
+      const primerErrorId = Object.keys(errores)[0];
+      if (primerErrorId) {
+        const el = document.getElementById(`input-${primerErrorId}`);
+        if (el) el.focus();
+      }
       return;
     }
 
     const nuevoProducto: ProductoAgregado = {
       id_temp: Date.now().toString() + Math.random().toString(36).substring(7),
-      proveedor_id: proveedorSeleccionado.id,
-      nombreProveedor: proveedorSeleccionado.nombre,
-      referencia,
+      proveedor_id: proveedorSeleccionado!.id,
+      nombreProveedor: proveedorSeleccionado!.nombre,
+      referencia: referencia.trim(),
       tallaCol,
       tallaEur,
       precio,
@@ -223,8 +276,10 @@ function CrearEncargo() {
     setTallaEur("");
     setPrecio("");
     setAbono("0");
+    setFechaEntrega("");
     setFoto(null);
     setObservaciones("");
+    setErroresCampos({});
     setMensaje("✅ Producto agregado a la lista");
   };
 
@@ -234,43 +289,56 @@ function CrearEncargo() {
 
   const crearEncargo = async () => {
     try {
-      setCargando(true);
-
-      const tieneProductoActual = referencia.trim() !== "";
-      
-      if (productosAgregados.length === 0 && !tieneProductoActual) {
-        setMensaje("❌ Debes agregar al menos un producto o llenar los datos del encargo");
-        return;
-      }
+      setMensaje("");
+      const nuevosErrores: Record<string, boolean> = {};
+      const listaFaltantes: string[] = [];
 
       if (!nombreCliente.trim()) {
-        setMensaje("❌ Debes escribir el nombre del cliente");
-        return;
+        nuevosErrores["nombreCliente"] = true;
+        listaFaltantes.push("Nombre del cliente");
       }
 
       if (!telefonoCliente.trim()) {
-        setMensaje("❌ Debes escribir el teléfono del cliente");
+        nuevosErrores["telefonoCliente"] = true;
+        listaFaltantes.push("Teléfono del cliente");
+      }
+
+      const tieneFormularioLleno = referencia.trim() !== "" || foto !== null || fechaEntrega.trim() !== "" || precio.trim() !== "";
+
+      if (productosAgregados.length === 0 && !tieneFormularioLleno) {
+        nuevosErrores["referencia"] = true;
+        nuevosErrores["tallaEur"] = true;
+        nuevosErrores["precio"] = true;
+        nuevosErrores["fechaEntrega"] = true;
+        nuevosErrores["foto"] = true;
+        nuevosErrores["proveedor"] = true;
+        setErroresCampos(nuevosErrores);
+        setMensaje("❌ Debes completar todos los datos del encargo y adjuntar la foto antes de enviar.");
         return;
       }
 
-      if (tieneProductoActual) {
-        if (!proveedorSeleccionado) {
-          setMensaje("❌ Debes seleccionar o crear un proveedor para el producto actual");
-          return;
-        }
-        if (!tallaCol.trim()) {
-          setMensaje("❌ Debes escribir talla COL para el producto actual");
-          return;
-        }
-        if (!tallaEur.trim()) {
-          setMensaje("❌ Debes escribir talla EUR para el producto actual");
-          return;
-        }
-        if (!precio || Number(precio) <= 0) {
-          setMensaje("❌ El precio debe ser mayor a 0 para el producto actual");
-          return;
-        }
+      if (tieneFormularioLleno) {
+        const prodVal = validarCamposProductoActual();
+        Object.assign(nuevosErrores, prodVal.errores);
+        listaFaltantes.push(...prodVal.faltantes);
       }
+
+      setErroresCampos(nuevosErrores);
+
+      if (listaFaltantes.length > 0) {
+        setMensaje(`❌ Faltan datos obligatorios o hay campos inválidos:\n• ${listaFaltantes.join("\n• ")}`);
+        const primerErrorKey = Object.keys(nuevosErrores)[0];
+        if (primerErrorKey) {
+          const el = document.getElementById(`input-${primerErrorKey}`);
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+            el.focus();
+          }
+        }
+        return;
+      }
+
+      setCargando(true);
 
       let cliente = clienteSeleccionado;
 
@@ -278,12 +346,13 @@ function CrearEncargo() {
         setMensaje("⏳ Creando cliente...");
 
         const clienteCreado = await crearClienteRequest({
-          nombre: nombreCliente,
-          telefono: telefonoCliente,
+          nombre: nombreCliente.trim(),
+          telefono: telefonoCliente.trim(),
         });
 
         if (!clienteCreado.id) {
-          setMensaje(clienteCreado.detail || "❌ Error al crear cliente");
+          setMensaje(`❌ Error al crear cliente: ${clienteCreado.detail || "Datos inválidos"}`);
+          setCargando(false);
           return;
         }
 
@@ -292,12 +361,12 @@ function CrearEncargo() {
       }
 
       const listaFinal: ProductoAgregado[] = [...productosAgregados];
-      if (tieneProductoActual && proveedorSeleccionado) {
+      if (tieneFormularioLleno && proveedorSeleccionado) {
         listaFinal.push({
           id_temp: "current",
           proveedor_id: proveedorSeleccionado.id,
           nombreProveedor: proveedorSeleccionado.nombre,
-          referencia,
+          referencia: referencia.trim(),
           tallaCol,
           tallaEur,
           precio,
@@ -313,6 +382,7 @@ function CrearEncargo() {
       let creados = 0;
       let conErrores = 0;
       let ultimoMensajeError = "";
+      const advertencias: string[] = [];
 
       for (const prod of listaFinal) {
         let rutaFoto = null;
@@ -321,6 +391,10 @@ function CrearEncargo() {
           const imagenSubida = await subirImagenRequest(prod.foto);
           if (imagenSubida.ruta) {
             rutaFoto = imagenSubida.ruta;
+          } else {
+            conErrores++;
+            ultimoMensajeError = "No se pudo subir la foto del producto a Cloudinary.";
+            continue;
           }
         }
 
@@ -333,7 +407,7 @@ function CrearEncargo() {
           foto: rutaFoto,
           precio: Number(prod.precio),
           abono: Number(prod.abono),
-          fecha_entrega_estimada: prod.fechaEntrega || null,
+          fecha_entrega_estimada: prod.fechaEntrega,
           observaciones: prod.observaciones || null,
         };
 
@@ -341,6 +415,9 @@ function CrearEncargo() {
 
         if (respuesta.id) {
           creados++;
+          if (respuesta.mensaje_advertencia) {
+            advertencias.push(respuesta.mensaje_advertencia);
+          }
         } else {
           conErrores++;
           if (respuesta.detail) {
@@ -351,7 +428,11 @@ function CrearEncargo() {
       }
 
       if (creados > 0 && conErrores === 0) {
-        setMensaje(`✅ ${creados} encargo(s) creado(s) correctamente`);
+        if (advertencias.length > 0) {
+          setMensaje(`⚠️ ${creados} encargo(s) creado(s) con advertencia:\n• ${advertencias.join("\n• ")}`);
+        } else {
+          setMensaje(`✅ ${creados} encargo(s) creado(s) correctamente`);
+        }
 
         setReferencia("");
         setTallaCol("");
@@ -368,6 +449,7 @@ function CrearEncargo() {
         setTelefonoProveedor("");
         setProveedorSeleccionado(null);
         setProductosAgregados([]);
+        setErroresCampos({});
       } else if (creados > 0 && conErrores > 0) {
         setMensaje(`⚠️ Se crearon ${creados} encargos, pero ${conErrores} fallaron. Último error: ${ultimoMensajeError}`);
       } else {
@@ -389,15 +471,17 @@ function CrearEncargo() {
         <h3>Cliente</h3>
 
         <div className="grid-form">
-          <div className="campo">
-            <label>Nombre del cliente</label>
+          <div className={`campo ${erroresCampos.nombreCliente ? "campo-invalid" : ""}`}>
+            <label>Nombre del cliente *</label>
 
             <input
+              id="input-nombreCliente"
               placeholder="Ej: Luis Pérez"
               value={nombreCliente}
               onChange={(e) => {
                 setNombreCliente(e.target.value);
                 setClienteSeleccionado(null);
+                limpiarError("nombreCliente");
               }}
             />
 
@@ -418,13 +502,17 @@ function CrearEncargo() {
               )}
           </div>
 
-          <div className="campo">
-            <label>Teléfono del cliente</label>
+          <div className={`campo ${erroresCampos.telefonoCliente ? "campo-invalid" : ""}`}>
+            <label>Teléfono del cliente *</label>
 
             <input
+              id="input-telefonoCliente"
               placeholder="Ej: 3242697263"
               value={telefonoCliente}
-              onChange={(e) => setTelefonoCliente(e.target.value)}
+              onChange={(e) => {
+                setTelefonoCliente(e.target.value);
+                limpiarError("telefonoCliente");
+              }}
             />
           </div>
         </div>
@@ -446,10 +534,11 @@ function CrearEncargo() {
         <h3>Encargo</h3>
 
         <div className="grid-form">
-          <div className="campo">
-            <label>Proveedor</label>
+          <div className={`campo ${erroresCampos.proveedor ? "campo-invalid" : ""}`}>
+            <label>Proveedor *</label>
 
             <select
+              id="input-proveedor"
               value={proveedorSeleccionado?.id || ""}
               onChange={(e) => {
                 const proveedor = proveedores.find(
@@ -461,6 +550,7 @@ function CrearEncargo() {
 
                   setNombreProveedor(proveedor.nombre);
                   setTelefonoProveedor(proveedor.telefono);
+                  limpiarError("proveedor");
                 }
               }}
             >
@@ -494,13 +584,17 @@ function CrearEncargo() {
             />
           </div>
 
-          <div className="campo">
-            <label>Referencia</label>
+          <div className={`campo ${erroresCampos.referencia ? "campo-invalid" : ""}`}>
+            <label>Referencia *</label>
 
             <input
+              id="input-referencia"
               placeholder="Ej: Nike Panda"
               value={referencia}
-              onChange={(e) => setReferencia(e.target.value)}
+              onChange={(e) => {
+                setReferencia(e.target.value);
+                limpiarError("referencia");
+              }}
             />
           </div>
 
@@ -515,15 +609,18 @@ function CrearEncargo() {
             />
           </div>
 
-          <div className="campo">
-            <label>Talla EUR</label>
+          <div className={`campo ${erroresCampos.tallaEur ? "campo-invalid" : ""}`}>
+            <label>Talla EUR *</label>
 
             <select
+              id="input-tallaEur"
               value={tallaEur}
               onChange={(e) => {
                 const val = e.target.value;
                 setTallaEur(val);
                 setTallaCol(MAPPING_TALLAS[val] || "");
+                limpiarError("tallaEur");
+                limpiarError("tallaCol");
               }}
             >
               <option value="">Selecciona talla EUR</option>
@@ -535,44 +632,60 @@ function CrearEncargo() {
             </select>
           </div>
 
-          <div className="campo">
-            <label>Precio</label>
+          <div className={`campo ${erroresCampos.precio ? "campo-invalid" : ""}`}>
+            <label>Precio *</label>
 
             <input
+              id="input-precio"
               placeholder="Ej: 250000"
               value={precio}
-              onChange={(e) => setPrecio(e.target.value)}
+              onChange={(e) => {
+                setPrecio(e.target.value);
+                limpiarError("precio");
+              }}
             />
           </div>
 
-          <div className="campo">
-            <label>Abono</label>
+          <div className={`campo ${erroresCampos.abono ? "campo-invalid" : ""}`}>
+            <label>Abono *</label>
 
             <input
-              placeholder="Ej: 50000"
+              id="input-abono"
+              placeholder="Ej: 50000 (0 para sin abono)"
               value={abono}
-              onChange={(e) => setAbono(e.target.value)}
+              onChange={(e) => {
+                setAbono(e.target.value);
+                limpiarError("abono");
+              }}
             />
           </div>
 
-          <div className="campo">
-            <label>Fecha estimada de entrega</label>
+          <div className={`campo ${erroresCampos.fechaEntrega ? "campo-invalid" : ""}`}>
+            <label>Fecha estimada de entrega *</label>
 
             <input
+              id="input-fechaEntrega"
               type="date"
               value={fechaEntrega}
-              onChange={(e) => setFechaEntrega(e.target.value)}
+              onChange={(e) => {
+                setFechaEntrega(e.target.value);
+                limpiarError("fechaEntrega");
+              }}
             />
           </div>
 
-          <div className="campo">
-            <label>Foto del producto</label>
+          <div className={`campo ${erroresCampos.foto ? "campo-invalid" : ""}`}>
+            <label>Foto del producto *</label>
 
             <input
+              id="input-foto"
               type="file"
               accept="image/*"
               key={`foto-${productosAgregados.length}`}
-              onChange={(e) => setFoto(e.target.files?.[0] || null)}
+              onChange={(e) => {
+                setFoto(e.target.files?.[0] || null);
+                limpiarError("foto");
+              }}
             />
           </div>
 

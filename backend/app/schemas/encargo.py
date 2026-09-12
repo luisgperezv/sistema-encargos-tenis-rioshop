@@ -42,19 +42,28 @@ class ProveedorMiniResponse(BaseModel):
 
 class EncargoCreate(BaseModel):
     cliente_id: int
-    proveedor_id: int | None = None
+    proveedor_id: int
     referencia: str
     talla_col: str
     talla_eur: str | None = None
-    foto: Optional[str] = None
+    foto: str
     precio: float
     abono: float = 0
-    fecha_entrega_estimada: str | None = None
+    fecha_entrega_estimada: str
     observaciones: str | None = None
+
+    @field_validator("proveedor_id")
+    @classmethod
+    def validar_proveedor_id(cls, value: int):
+        if not value or value <= 0:
+            raise ValueError("El proveedor es obligatorio")
+        return value
 
     @field_validator("referencia")
     @classmethod
     def limpiar_referencia(cls, value: str):
+        if not value or not value.strip():
+            raise ValueError("La referencia es obligatoria")
         value = " ".join(value.strip().split())
         if len(value) < 2:
             raise ValueError("La referencia es demasiado corta")
@@ -87,6 +96,34 @@ class EncargoCreate(BaseModel):
 
         return value
 
+    @field_validator("foto")
+    @classmethod
+    def validar_foto(cls, value: str):
+        if not value or not value.strip():
+            raise ValueError("La foto del producto es obligatoria")
+        return value.strip()
+
+    @field_validator("fecha_entrega_estimada")
+    @classmethod
+    def validar_fecha_entrega_estimada(cls, value: str):
+        if not value or not value.strip():
+            raise ValueError("La fecha estimada de entrega es obligatoria")
+        return value.strip()
+
+    @field_validator("precio")
+    @classmethod
+    def validar_precio(cls, value: float):
+        if value is None or value <= 0:
+            raise ValueError("El precio debe ser mayor a 0")
+        return value
+
+    @field_validator("abono")
+    @classmethod
+    def validar_abono(cls, value: float):
+        if value is None or value < 0:
+            raise ValueError("El abono no puede ser negativo")
+        return value
+
     @field_validator("observaciones")
     @classmethod
     def limpiar_observaciones(cls, value: str | None):
@@ -95,10 +132,13 @@ class EncargoCreate(BaseModel):
         return " ".join(value.strip().split())
 
     @model_validator(mode="after")
-    def validar_par_tallas(self):
+    def validar_finanzas_y_par_tallas(self):
+        if self.abono > self.precio:
+            raise ValueError("El abono no puede ser mayor que el precio")
+
         opciones_eur = TALLAS_VALIDAS[self.talla_col]
 
-        if self.talla_eur is None:
+        if self.talla_eur is None or self.talla_eur.strip() == "":
             if len(opciones_eur) == 1:
                 self.talla_eur = opciones_eur[0]
             else:
@@ -241,6 +281,7 @@ class EncargoResponse(BaseModel):
     motivo_cancelacion: Optional[str] = None
     fecha_cancelacion: Optional[str] = None
     metodo_pago: Optional[str] = None
+    mensaje_advertencia: Optional[str] = None
     cliente: ClienteMiniResponse
     proveedor: ProveedorMiniResponse | None = None
 

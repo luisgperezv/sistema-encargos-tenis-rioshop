@@ -15,6 +15,7 @@ from app.services.whatsapp import (
     enviar_template_encargo_en_local,
     enviar_template_proveedor_encargo,
     enviar_template_proveedor_foto,
+    validar_y_normalizar_telefono,
 )
 from app.services.utils import formatear_pesos
 from app.services.ventas import crear_venta_desde_encargo_si_no_existe
@@ -122,22 +123,69 @@ def crear_encargo(
     db: Session = Depends(get_db),
     current_user: str = Depends(get_current_user),
 ):
+    # 1. VERIFICAR CLIENTE
     cliente = db.query(Cliente).filter(Cliente.id == encargo.cliente_id).first()
-
     if not cliente:
-        raise HTTPException(status_code=404, detail="El cliente no existe")
+        raise HTTPException(status_code=404, detail="El cliente especificado no existe.")
 
-    proveedor = None
-    if encargo.proveedor_id is not None:
-        proveedor = (
-            db.query(Proveedor).filter(Proveedor.id == encargo.proveedor_id).first()
+    if not cliente.nombre or not cliente.nombre.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="El cliente seleccionado no tiene un nombre válido registrado."
         )
 
-        if not proveedor:
-            raise HTTPException(status_code=404, detail="El proveedor no existe")
+    if not cliente.telefono or not cliente.telefono.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="El cliente seleccionado no tiene un número de teléfono registrado."
+        )
+
+    telefono_cliente_norm = validar_y_normalizar_telefono(cliente.telefono)
+    if not telefono_cliente_norm:
+        raise HTTPException(
+            status_code=400,
+            detail="El número de teléfono del cliente no es un número de WhatsApp válido (debe contener entre 10 y 15 dígitos)."
+        )
+
+    # 2. VERIFICAR PROVEEDOR
+    if not encargo.proveedor_id or encargo.proveedor_id <= 0:
+        raise HTTPException(status_code=400, detail="El proveedor es obligatorio.")
+
+    proveedor = (
+        db.query(Proveedor).filter(Proveedor.id == encargo.proveedor_id).first()
+    )
+    if not proveedor:
+        raise HTTPException(status_code=404, detail="El proveedor especificado no existe.")
+
+    if not proveedor.nombre or not proveedor.nombre.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="El proveedor seleccionado no tiene un nombre válido registrado."
+        )
+
+    if not proveedor.telefono or not proveedor.telefono.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="El proveedor seleccionado no tiene un número de teléfono registrado."
+        )
+
+    telefono_proveedor_norm = validar_y_normalizar_telefono(proveedor.telefono)
+    if not telefono_proveedor_norm:
+        raise HTTPException(
+            status_code=400,
+            detail="El número de teléfono del proveedor no es un número de WhatsApp válido (debe contener entre 10 y 15 dígitos)."
+        )
+
+    # 3. VERIFICAR DATOS REQUERIDOS DEL ENCARGO
+    if not encargo.foto or not encargo.foto.strip():
+        raise HTTPException(status_code=400, detail="La foto del producto es obligatoria.")
+
+    if not encargo.fecha_entrega_estimada or not encargo.fecha_entrega_estimada.strip():
+        raise HTTPException(status_code=400, detail="La fecha estimada de entrega es obligatoria.")
 
     saldo = validar_finanzas(encargo.precio, encargo.abono)
 
+    # 4. CREAR ENCARGO EN BASE DE DATOS
     nuevo_encargo = Encargo(
         cliente_id=encargo.cliente_id,
         proveedor_id=encargo.proveedor_id,
@@ -150,27 +198,24 @@ def crear_encargo(
         saldo=saldo,
         estado="pendiente",
         fecha_creacion=str(date.today()),
-        fecha_entrega_estimada=encargo.fecha_entrega_estimada,
+        fecha_entrega_estimada=encargo.fecha_entrega_estimada.strip(),
         observaciones=encargo.observaciones,
     )
 
     nuevo_encargo.cliente = cliente
-    if proveedor is not None:
-        nuevo_encargo.proveedor = proveedor
+    nuevo_encargo.proveedor = proveedor
 
     db.add(nuevo_encargo)
     db.commit()
     db.refresh(nuevo_encargo)
 
+    # 5. INTENTAR NOTIFICAR AL CLIENTE VÍA WHATSAPP
+    image_url = nuevo_encargo.foto
+    respuesta_whatsapp_cliente = None
     try:
-        image_url = None
-
-        if nuevo_encargo.foto:
-            image_url = nuevo_encargo.foto
-
         if image_url:
-            respuesta_whatsapp = enviar_template_confirmacion_encargo_foto(
-                numero=cliente.telefono,
+            respuesta_whatsapp_cliente = enviar_template_confirmacion_encargo_foto(
+                numero=telefono_cliente_norm,
                 image_url=image_url,
                 nombre=cliente.nombre,
                 referencia=nuevo_encargo.referencia,
@@ -179,11 +224,11 @@ def crear_encargo(
                 precio=formatear_pesos(nuevo_encargo.precio),
                 abono=formatear_pesos(nuevo_encargo.abono),
                 saldo=formatear_pesos(nuevo_encargo.saldo),
-                fecha_estimada=nuevo_encargo.fecha_entrega_estimada or "",
+                fecha_estimada=nuevo_encargo.fecha_entrega_estimada,
             )
         else:
-            respuesta_whatsapp = enviar_template_confirmacion_encargo(
-                numero=cliente.telefono,
+            respuesta_whatsapp_cliente = enviar_template_confirmacion_encargo(
+                numero=telefono_cliente_norm,
                 nombre=cliente.nombre,
                 referencia=nuevo_encargo.referencia,
                 talla_col=nuevo_encargo.talla_col,
@@ -191,56 +236,86 @@ def crear_encargo(
                 precio=formatear_pesos(nuevo_encargo.precio),
                 abono=formatear_pesos(nuevo_encargo.abono),
                 saldo=formatear_pesos(nuevo_encargo.saldo),
-                fecha_estimada=nuevo_encargo.fecha_entrega_estimada or "",
+                fecha_estimada=nuevo_encargo.fecha_entrega_estimada,
+            )
+        print("WHATSAPP CLIENTE:", respuesta_whatsapp_cliente)
+    except Exception as e:
+        print("Exception al enviar WhatsApp al cliente:", e)
+        respuesta_whatsapp_cliente = {"error": str(e)}
+
+    # Evaluar resultado del envío al cliente
+    cliente_notificado = True
+    det_msg = None
+
+    if not respuesta_whatsapp_cliente:
+        cliente_notificado = False
+        det_msg = "Respuesta vacía del servicio Meta WhatsApp"
+    elif isinstance(respuesta_whatsapp_cliente, dict) and respuesta_whatsapp_cliente.get("error"):
+        cliente_notificado = False
+        err_obj = respuesta_whatsapp_cliente["error"]
+        det_msg = err_obj.get("message") if isinstance(err_obj, dict) else str(err_obj)
+
+    if not cliente_notificado:
+        # NO borrar el encargo de la BD. Conservar registro.
+        # NO enviar notificación al proveedor si falló la notificación obligatoria al cliente.
+        nuevo_encargo.mensaje_advertencia = (
+            f"El encargo fue creado en la base de datos, pero no fue posible enviar la notificación por WhatsApp al cliente ({det_msg}). "
+            f"No se envió notificación al proveedor."
+        )
+        return nuevo_encargo
+
+    # 6. SI CLIENTE FUE NOTIFICADO EXITOSAMENTE -> INTENTAR NOTIFICAR AL PROVEEDOR
+    respuesta_whatsapp_proveedor = None
+    try:
+        if image_url:
+            respuesta_whatsapp_proveedor = enviar_template_proveedor_foto(
+                numero=telefono_proveedor_norm,
+                image_url=image_url,
+                referencia=nuevo_encargo.referencia,
+                talla_eur=nuevo_encargo.talla_eur,
+            )
+        else:
+            respuesta_whatsapp_proveedor = enviar_template_proveedor_encargo(
+                numero=telefono_proveedor_norm,
+                referencia=nuevo_encargo.referencia,
+                talla_eur=nuevo_encargo.talla_eur,
             )
 
-        print("WHATSAPP CLIENTE:", respuesta_whatsapp)
+        print("WHATSAPP PROVEEDOR:", respuesta_whatsapp_proveedor)
 
+        if (
+            respuesta_whatsapp_proveedor
+            and isinstance(respuesta_whatsapp_proveedor, dict)
+            and "messages" in respuesta_whatsapp_proveedor
+            and len(respuesta_whatsapp_proveedor["messages"]) > 0
+        ):
+            wamid = respuesta_whatsapp_proveedor["messages"][0]["id"]
+            nuevo_msg = MensajeProveedor(
+                proveedor_id=proveedor.id,
+                telefono=proveedor.telefono,
+                nombre_perfil=None,
+                direccion="saliente",
+                tipo="image" if image_url else "text",
+                contenido=f"Talla EUR: {nuevo_encargo.talla_eur}",
+                media_url=image_url,
+                whatsapp_message_id=wamid,
+            )
+            db.add(nuevo_msg)
+            db.commit()
+            print(f"[AUTO_MSG] Mensaje saliente automatico persistido en BD. wamid: {wamid}", flush=True)
+        elif isinstance(respuesta_whatsapp_proveedor, dict) and respuesta_whatsapp_proveedor.get("error"):
+            err_prov = respuesta_whatsapp_proveedor["error"]
+            msg_prov = err_prov.get("message") if isinstance(err_prov, dict) else str(err_prov)
+            nuevo_encargo.mensaje_advertencia = (
+                f"El encargo fue creado y el cliente fue notificado, pero no fue posible notificar al proveedor por WhatsApp ({msg_prov}). "
+                f"Puede utilizar la opción 'Reenviar a proveedor' más tarde."
+            )
     except Exception as e:
-        print("Error enviando template al cliente:", e)
-
-    if proveedor is not None:
-        try:
-            image_url = None
-
-            if nuevo_encargo.foto:
-                image_url = nuevo_encargo.foto
-
-            if image_url:
-                respuesta_whatsapp_proveedor = enviar_template_proveedor_foto(
-                    numero=proveedor.telefono,
-                    image_url=image_url,
-                    referencia=nuevo_encargo.referencia,
-                    talla_eur=nuevo_encargo.talla_eur,
-                )
-            else:
-                respuesta_whatsapp_proveedor = enviar_template_proveedor_encargo(
-                    numero=proveedor.telefono,
-                    referencia=nuevo_encargo.referencia,
-                    talla_eur=nuevo_encargo.talla_eur,
-                )
-
-            print("WHATSAPP PROVEEDOR:", respuesta_whatsapp_proveedor)
-
-            # Persistir mensaje automático enviado en base de datos
-            if respuesta_whatsapp_proveedor and "messages" in respuesta_whatsapp_proveedor and len(respuesta_whatsapp_proveedor["messages"]) > 0:
-                wamid = respuesta_whatsapp_proveedor["messages"][0]["id"]
-                nuevo_msg = MensajeProveedor(
-                    proveedor_id=proveedor.id,
-                    telefono=proveedor.telefono,
-                    nombre_perfil=None,
-                    direccion="saliente",
-                    tipo="image" if image_url else "text",
-                    contenido=f"Talla EUR: {nuevo_encargo.talla_eur}",
-                    media_url=image_url,
-                    whatsapp_message_id=wamid
-                )
-                db.add(nuevo_msg)
-                db.commit()
-                print(f"[AUTO_MSG] Mensaje saliente automatico persistido en BD. wamid: {wamid}", flush=True)
-
-        except Exception as e:
-            print("Error enviando template al proveedor:", e)
+        print("Error enviando template al proveedor:", e)
+        nuevo_encargo.mensaje_advertencia = (
+            f"El encargo fue creado y el cliente fue notificado, pero ocurrió una excepción al notificar al proveedor: {e}. "
+            f"Puede utilizar la opción 'Reenviar a proveedor' más tarde."
+        )
 
     return nuevo_encargo
 
@@ -384,6 +459,122 @@ def reenviar_encargo_proveedor(
         raise HTTPException(
             status_code=500,
             detail="Error reenviando encargo al proveedor",
+        )
+
+
+@router.post("/encargos/{encargo_id}/reenviar-cliente")
+def reenviar_encargo_cliente(
+    encargo_id: int,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user),
+):
+    encargo = (
+        db.query(Encargo)
+        .options(joinedload(Encargo.cliente))
+        .filter(Encargo.id == encargo_id)
+        .first()
+    )
+
+    if not encargo:
+        raise HTTPException(status_code=404, detail="El encargo especificado no existe.")
+
+    cliente = encargo.cliente
+    if not cliente:
+        raise HTTPException(status_code=404, detail="El cliente asociado a este encargo no existe.")
+
+    if not cliente.nombre or not cliente.nombre.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="El cliente no tiene un nombre válido registrado."
+        )
+
+    if not cliente.telefono or not cliente.telefono.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="El cliente no tiene un número de teléfono registrado."
+        )
+
+    telefono_cliente_norm = validar_y_normalizar_telefono(cliente.telefono)
+    if not telefono_cliente_norm:
+        raise HTTPException(
+            status_code=400,
+            detail="El teléfono del cliente no es un número de WhatsApp válido (debe tener entre 10 y 15 dígitos)."
+        )
+
+    if not encargo.referencia or not encargo.referencia.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="El encargo no tiene una referencia válida."
+        )
+
+    if not encargo.talla_eur or not encargo.talla_eur.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="El encargo no tiene una talla EUR registrada."
+        )
+
+    if not encargo.fecha_entrega_estimada or not encargo.fecha_entrega_estimada.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="El encargo no tiene una fecha estimada de entrega registrada."
+        )
+
+    image_url = encargo.foto
+    respuesta_whatsapp = None
+
+    try:
+        if image_url:
+            respuesta_whatsapp = enviar_template_confirmacion_encargo_foto(
+                numero=telefono_cliente_norm,
+                image_url=image_url,
+                nombre=cliente.nombre,
+                referencia=encargo.referencia,
+                talla_col=encargo.talla_col,
+                talla_eur=encargo.talla_eur,
+                precio=formatear_pesos(encargo.precio),
+                abono=formatear_pesos(encargo.abono),
+                saldo=formatear_pesos(encargo.saldo),
+                fecha_estimada=encargo.fecha_entrega_estimada,
+            )
+        else:
+            respuesta_whatsapp = enviar_template_confirmacion_encargo(
+                numero=telefono_cliente_norm,
+                nombre=cliente.nombre,
+                referencia=encargo.referencia,
+                talla_col=encargo.talla_col,
+                talla_eur=encargo.talla_eur,
+                precio=formatear_pesos(encargo.precio),
+                abono=formatear_pesos(encargo.abono),
+                saldo=formatear_pesos(encargo.saldo),
+                fecha_estimada=encargo.fecha_entrega_estimada,
+            )
+
+        print("REENVÍO WHATSAPP CLIENTE:", respuesta_whatsapp)
+
+        if not respuesta_whatsapp or respuesta_whatsapp.get("error"):
+            det_msg = "Error desconocido al enviar WhatsApp al cliente"
+            if respuesta_whatsapp and respuesta_whatsapp.get("error"):
+                err_obj = respuesta_whatsapp["error"]
+                det_msg = err_obj.get("message") if isinstance(err_obj, dict) else str(err_obj)
+            raise HTTPException(
+                status_code=400,
+                detail=f"No se pudo notificar al cliente por WhatsApp: {det_msg}"
+            )
+
+        return {
+            "mensaje": "Notificación reenviada al cliente por WhatsApp correctamente",
+            "encargo_id": encargo.id,
+            "cliente": cliente.nombre,
+            "respuesta_whatsapp": respuesta_whatsapp,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print("Error reenviando notificación al cliente:", e)
+        raise HTTPException(
+            status_code=400,
+            detail=f"Error al enviar notificación por WhatsApp al cliente: {str(e)}"
         )
 
 @router.delete("/encargos/{encargo_id}")

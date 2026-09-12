@@ -259,6 +259,19 @@ export const reenviarEncargoProveedorRequest = async (encargoId: number, proveed
   return res.json();
 };
 
+export const reenviarEncargoClienteRequest = async (encargoId: number) => {
+  const token = localStorage.getItem("token");
+
+  const res = await fetch(`${API_URL}/encargos/${encargoId}/reenviar-cliente`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return res.json();
+};
+
 export const listarConversacionesProveedoresRequest = async () => {
   const token = localStorage.getItem("token");
 
