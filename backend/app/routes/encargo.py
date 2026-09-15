@@ -49,7 +49,6 @@ UPLOADS_DIR = os.path.join(BASE_DIR, "uploads")
 
 ESTADOS_VALIDOS = [
     "pendiente",
-    "pedido",
     "despachado",
     "en_local",
     "entregado",

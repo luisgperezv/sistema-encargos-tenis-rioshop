@@ -64,7 +64,7 @@ const OPCIONES_TALLA_EUR = ORDEN_TALLAS;
 
 const colorEstado = (estado: string) => {
   if (estado === "pendiente") return "rgba(239, 68, 68, 0.05)";
-  if (estado === "pedido" || estado === "despachado" || estado === "en_local")
+  if (estado === "despachado" || estado === "en_local")
     return "rgba(245, 158, 11, 0.05)";
   if (estado === "entregado") return "rgba(16, 185, 129, 0.05)";
   if (estado === "cancelado") return "rgba(107, 114, 128, 0.05)";
@@ -134,10 +134,19 @@ function ListarEncargos() {
     (encargo) => encargo.estado === "entregado",
   ).length;
 
-  const saldoTotal = encargos.reduce(
-    (total, encargo) => total + Number(encargo.saldo || 0),
-    0,
-  );
+  // Saldo por cobrar: solo encargos activos (pendiente, despachado, en_local)
+  // - Si el filtro es "entregado" o "cancelado", mostrar $0
+  // - Si el filtro es uno de los estados activos, sumar solo esos encargos
+  // - Sin filtro (todos), sumar solo los activos del listado actual
+  const ESTADOS_ACTIVOS = ["pendiente", "despachado", "en_local"];
+  const saldoTotal = (() => {
+    if (estadoFiltro === "entregado" || estadoFiltro === "cancelado") {
+      return 0;
+    }
+    return encargos
+      .filter((encargo) => ESTADOS_ACTIVOS.includes(encargo.estado))
+      .reduce((total, encargo) => total + Number(encargo.saldo || 0), 0);
+  })();
 
   const cargarEncargos = async () => {
     const data = await listarEncargosRequest(buscar, estadoFiltro);
@@ -526,7 +535,6 @@ function ListarEncargos() {
         >
           <option value="">Todos los estados</option>
           <option value="pendiente">Pendiente</option>
-          <option value="pedido">Pedido</option>
           <option value="despachado">Despachado</option>
           <option value="en_local">En local</option>
           <option value="entregado">Entregado</option>
@@ -849,7 +857,7 @@ function ListarEncargos() {
                     </div>
                   )}
 
-                {(encargo.estado === "pendiente" || encargo.estado === "pedido") &&
+                {encargo.estado === "pendiente" &&
                   (encargoReenviando === encargo.id ? (
                     <div className="reenvio-container">
                       <select
@@ -912,7 +920,6 @@ function ListarEncargos() {
                   onChange={(e) => handleSelectEstado(encargo, e.target.value)}
                 >
                   <option value="pendiente">Pendiente</option>
-                  <option value="pedido">Pedido</option>
                   <option value="despachado">Despachado</option>
                   <option value="en_local">En local</option>
                   <option

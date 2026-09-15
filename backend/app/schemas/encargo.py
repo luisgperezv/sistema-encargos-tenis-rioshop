@@ -239,7 +239,6 @@ class EncargoEstadoUpdate(BaseModel):
     def validar_estado(cls, value: str):
         estados_validos = [
             "pendiente",
-            "pedido",
             "despachado",
             "en_local",
             "entregado",
