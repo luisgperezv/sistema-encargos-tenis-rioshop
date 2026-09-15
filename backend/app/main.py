@@ -9,6 +9,7 @@ from app.models import venta
 from app.models import inventario
 from app.models import inventario_talla
 from app.models import venta_operacion
+from app.models import gasto
 
 from app.routes import cliente as cliente_router
 from app.routes import encargo as encargo_router
@@ -16,6 +17,7 @@ from app.routes import proveedor as proveedor_router
 from app.routes import mensaje_proveedor as mensaje_proveedor_router
 from app.routes import venta as venta_router
 from app.routes import inventario as inventario_router
+from app.routes import gasto as gasto_router
 
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,6 +25,7 @@ from app.routes import auth as auth_router
 import os
 
 Base.metadata.create_all(bind=engine)
+
 
 def ejecutar_migraciones_ligeras():
     """
@@ -375,6 +378,7 @@ app.include_router(mensaje_proveedor_router.router)
 app.include_router(auth_router.router)
 app.include_router(venta_router.router)
 app.include_router(inventario_router.router)
+app.include_router(gasto_router.router)
 
 
 @app.get("/")

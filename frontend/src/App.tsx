@@ -8,6 +8,7 @@ import EncargosPage from "./pages/EncargosPage";
 import MensajesProveedores from "./pages/MensajesProveedores";
 import InventarioPage from "./pages/InventarioPage";
 import POSPage from "./pages/POSPage";
+import GastosPage from "./pages/GastosPage";
 
 import "./App.css";
 
@@ -91,6 +92,17 @@ function App() {
           element={
             logueado ? (
               <POSPage />
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+
+        <Route
+          path="/dashboard/gastos"
+          element={
+            logueado ? (
+              <GastosPage />
             ) : (
               <Navigate to="/login" />
             )
