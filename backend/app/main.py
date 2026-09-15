@@ -18,6 +18,7 @@ from app.routes import mensaje_proveedor as mensaje_proveedor_router
 from app.routes import venta as venta_router
 from app.routes import inventario as inventario_router
 from app.routes import gasto as gasto_router
+from app.routes import resumen as resumen_router
 
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -379,6 +380,7 @@ app.include_router(auth_router.router)
 app.include_router(venta_router.router)
 app.include_router(inventario_router.router)
 app.include_router(gasto_router.router)
+app.include_router(resumen_router.router)
 
 
 @app.get("/")
