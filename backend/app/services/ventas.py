@@ -4,7 +4,7 @@ from app.models.encargo import Encargo
 from app.models.venta import Venta
 from app.models.cliente import Cliente
 from app.models.proveedor import Proveedor
-from datetime import date, datetime
+from datetime import date, datetime, timezone, timedelta
 from decimal import Decimal
 import uuid
 from sqlalchemy.exc import IntegrityError
@@ -12,6 +12,8 @@ from app.models.venta_operacion import VentaOperacion
 from app.models.inventario_talla import InventarioTalla
 from app.models.inventario import Inventario
 from app.schemas.venta import VentaCheckoutCreate
+
+ZONA_COLOMBIA = timezone(timedelta(hours=-5))
 
 
 def crear_venta_desde_encargo_si_no_existe(db: Session, encargo: Encargo) -> Venta | None:
@@ -110,6 +112,14 @@ def generar_numero_venta() -> str:
 
 
 def procesar_checkout(db: Session, data: VentaCheckoutCreate, origen: str = "inventario") -> VentaOperacion:
+    # 0. Idempotencia persistente en backend: si ya existe una operación con este idempotency_key, retornarla
+    if data.idempotency_key:
+        op_existente = db.query(VentaOperacion).filter(
+            VentaOperacion.idempotency_key == data.idempotency_key
+        ).first()
+        if op_existente:
+            return op_existente
+
     # 1. Validar que no vengan talla_ids duplicados
     talla_ids = [item.inventario_talla_id for item in data.items]
     if len(talla_ids) != len(set(talla_ids)):
@@ -132,6 +142,7 @@ def procesar_checkout(db: Session, data: VentaCheckoutCreate, origen: str = "inv
             
         operacion = VentaOperacion(
             numero_venta=numero_venta,
+            idempotency_key=data.idempotency_key,
             cliente_id=data.cliente_id,
             cliente_nombre=data.cliente_nombre.strip() if data.cliente_nombre and data.cliente_nombre.strip() else "Cliente casual",
             cliente_telefono=data.cliente_telefono.strip() if data.cliente_telefono and data.cliente_telefono.strip() else None,
@@ -151,6 +162,13 @@ def procesar_checkout(db: Session, data: VentaCheckoutCreate, origen: str = "inv
             break
         except IntegrityError:
             db.rollback()
+            # En caso de colisión concurrente sobre idempotency_key
+            if data.idempotency_key:
+                op_concurrente = db.query(VentaOperacion).filter(
+                    VentaOperacion.idempotency_key == data.idempotency_key
+                ).first()
+                if op_concurrente:
+                    return op_concurrente
             operacion = None
             if int_num == intentos - 1:
                 raise HTTPException(
@@ -240,7 +258,7 @@ def procesar_checkout(db: Session, data: VentaCheckoutCreate, origen: str = "inv
                 costo_total=float(costo_linea_dec),
                 utilidad=float(utilidad_linea_dec),
                 metodo_pago=data.metodo_pago,
-                fecha_venta=str(date.today()),
+                fecha_venta=datetime.now(ZONA_COLOMBIA).strftime("%Y-%m-%d"),
                 origen=origen,
                 observaciones=data.observaciones
             )
@@ -265,6 +283,13 @@ def procesar_checkout(db: Session, data: VentaCheckoutCreate, origen: str = "inv
 
     except Exception as e:
         db.rollback()
+        # En caso de colisión concurrente sobre idempotency_key en commit
+        if isinstance(e, IntegrityError) and data.idempotency_key:
+            op_concurrente = db.query(VentaOperacion).filter(
+                VentaOperacion.idempotency_key == data.idempotency_key
+            ).first()
+            if op_concurrente:
+                return op_concurrente
         if isinstance(e, HTTPException):
             raise e
         raise HTTPException(

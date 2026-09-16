@@ -1,3 +1,4 @@
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
@@ -85,6 +86,7 @@ def registrar_venta_directa(
     checkout_data = VentaCheckoutCreate(
         items=[checkout_item],
         metodo_pago=data.metodo_pago,
+        idempotency_key=f"directa-{uuid.uuid4().hex}",
         cliente_nombre=data.cliente_nombre,
         cliente_telefono=data.cliente_telefono,
         observaciones=data.observaciones

@@ -9,6 +9,7 @@ class VentaOperacion(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     numero_venta = Column(String, unique=True, index=True, nullable=False)
+    idempotency_key = Column(String(64), nullable=True)
     cliente_id = Column(Integer, nullable=True)
     cliente_nombre = Column(String, nullable=True)
     cliente_telefono = Column(String, nullable=True)

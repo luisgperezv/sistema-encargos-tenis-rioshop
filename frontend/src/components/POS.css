@@ -376,11 +376,13 @@
 
 .inline-inputs-row {
   display: flex;
-  gap: 0.75rem;
+  flex-direction: column;
+  gap: 0.6rem;
+  width: 100%;
 }
 
 .price-input-wrapper {
-  flex: 2;
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
@@ -393,22 +395,31 @@
 }
 
 .price-input-wrapper input {
+  width: 100%;
+  box-sizing: border-box;
   padding: 0.4rem 0.75rem;
   font-size: 0.9rem;
   background: rgba(15, 23, 42, 0.8);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  min-width: 0;
 }
 
 .quantity-controller {
-  flex: 1.5;
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  align-items: center;
+  align-items: stretch;
 }
 
 .qty-controls {
+  width: 100%;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   background: rgba(15, 23, 42, 0.8);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
@@ -417,12 +428,16 @@
 }
 
 .qty-controls button {
-  width: 28px;
+  flex: 1;
+  max-width: 45px;
   height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
   transition: all var(--transition-fast);
 }
 
@@ -437,10 +452,11 @@
 }
 
 .qty-controls span {
-  width: 30px;
+  flex: 2;
   text-align: center;
   font-size: 0.9rem;
   font-weight: 600;
+  color: var(--text-primary);
 }
 
 .btn-add-to-cart {

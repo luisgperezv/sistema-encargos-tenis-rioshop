@@ -347,6 +347,22 @@ def ejecutar_migraciones_ligeras():
     except Exception as label_err:
         db.rollback()
         logging.warning(f"[MIGRACIÓN WARNING] Error migrando etiquetas de tallas: {str(label_err)}")
+
+    # 9. Verificar/agregar columna idempotency_key con índice UNIQUE en venta_operaciones
+    try:
+        db.execute(text("SELECT idempotency_key FROM venta_operaciones LIMIT 1"))
+        print("[MIGRACIÓN] La columna idempotency_key ya existe en la tabla venta_operaciones.", flush=True)
+    except Exception:
+        db.rollback()
+        print("[MIGRACIÓN] La columna idempotency_key no existe. Intentando agregarla con índice UNIQUE...", flush=True)
+        try:
+            db.execute(text("ALTER TABLE venta_operaciones ADD COLUMN idempotency_key VARCHAR(64)"))
+            db.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_venta_operaciones_idempotency_key ON venta_operaciones (idempotency_key)"))
+            db.commit()
+            print("[MIGRACIÓN] Columna idempotency_key e índice uq_venta_operaciones_idempotency_key creados exitosamente.", flush=True)
+        except Exception as alter_err:
+            db.rollback()
+            logging.warning(f"[MIGRACIÓN WARNING] No se pudo agregar la columna idempotency_key automáticamente: {str(alter_err)}.")
                 
     db.close()
 

@@ -612,6 +612,7 @@ export interface VentaCheckoutItem {
 export interface VentaCheckoutCreate {
   items: VentaCheckoutItem[];
   metodo_pago: string;
+  idempotency_key: string;
   cliente_id?: number | null;
   cliente_nombre?: string | null;
   cliente_telefono?: string | null;
@@ -621,6 +622,7 @@ export interface VentaCheckoutCreate {
 export interface VentaOperacion {
   id: number;
   numero_venta: string;
+  idempotency_key?: string | null;
   cliente_id?: number | null;
   cliente_nombre?: string | null;
   cliente_telefono?: string | null;

@@ -50,6 +50,28 @@ class VentaResponse(BaseModel):
         from_attributes = True
 
 
+METODOS_PAGO_VALIDOS = {
+    "Efectivo",
+    "Transferencia",
+    "Tarjeta Débito",
+    "Tarjeta Crédito",
+    "Addi",
+    "Sistecrédito",
+}
+
+MAPA_NORMALIZACION_METODOS = {
+    "efectivo": "Efectivo",
+    "transferencia": "Transferencia",
+    "tarjeta debito": "Tarjeta Débito",
+    "tarjeta débito": "Tarjeta Débito",
+    "tarjeta credito": "Tarjeta Crédito",
+    "tarjeta crédito": "Tarjeta Crédito",
+    "addi": "Addi",
+    "sistecredito": "Sistecrédito",
+    "sistecrédito": "Sistecrédito",
+}
+
+
 class VentaCheckoutItem(BaseModel):
     inventario_talla_id: int
     cantidad: int = Field(..., gt=0)
@@ -59,6 +81,7 @@ class VentaCheckoutItem(BaseModel):
 class VentaCheckoutCreate(BaseModel):
     items: List[VentaCheckoutItem]
     metodo_pago: str
+    idempotency_key: str = Field(..., min_length=1, max_length=64, description="Clave única técnica de idempotencia")
     cliente_id: Optional[int] = None
     cliente_nombre: Optional[str] = None
     cliente_telefono: Optional[str] = None
@@ -71,17 +94,35 @@ class VentaCheckoutCreate(BaseModel):
             raise ValueError("Debe incluir al menos un ítem para realizar el checkout.")
         return value
 
+    @field_validator("idempotency_key")
+    @classmethod
+    def validar_idempotency_key(cls, value: str):
+        val = value.strip()
+        if not val:
+            raise ValueError("idempotency_key no puede estar vacía.")
+        if len(val) > 64:
+            raise ValueError("idempotency_key no puede exceder 64 caracteres.")
+        return val
+
     @field_validator("metodo_pago")
     @classmethod
     def validar_metodo_pago(cls, value: str):
         if not value or not value.strip():
             raise ValueError("El método de pago es obligatorio.")
-        return value.strip()
+        val_clean = value.strip()
+        # Normalizar si coincide con mayúsculas/minúsculas conocidas
+        val_normalizado = MAPA_NORMALIZACION_METODOS.get(val_clean.lower(), val_clean)
+        if val_normalizado not in METODOS_PAGO_VALIDOS:
+            raise ValueError(
+                f"Método de pago no permitido: '{value}'. Permitidos: {', '.join(sorted(METODOS_PAGO_VALIDOS))}"
+            )
+        return val_normalizado
 
 
 class VentaOperacionResponse(BaseModel):
     id: int
     numero_venta: str
+    idempotency_key: Optional[str] = None
     cliente_id: Optional[int] = None
     cliente_nombre: Optional[str] = None
     cliente_telefono: Optional[str] = None

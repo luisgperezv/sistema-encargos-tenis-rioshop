@@ -71,6 +71,14 @@ const ORDEN_TALLAS = [
   "36", "37", "38", "39", "40D", "40H", "41D", "41H", "42", "43", "44", "45"
 ];
 
+// Generador de clave única de idempotencia
+const generarIdempotencyKey = (): string => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return "pos-" + Date.now() + "-" + Math.random().toString(36).substring(2, 15);
+};
+
 function POS() {
   // Estados de carga de datos
   const [productos, setProductos] = useState<ArticuloInventario[]>([]);
@@ -102,6 +110,7 @@ function POS() {
   const [clienteTelefono, setClienteTelefono] = useState("");
   const [metodoPago, setMetodoPago] = useState("");
   const [observaciones, setObservaciones] = useState("");
+  const [idempotencyKey, setIdempotencyKey] = useState<string>(() => generarIdempotencyKey());
 
   // Control de interfaz móvil
   const [verCarritoMovil, setVerCarritoMovil] = useState(false);
@@ -361,6 +370,7 @@ function POS() {
     const checkoutData: VentaCheckoutCreate = {
       items: itemsRequest,
       metodo_pago: metodoPago,
+      idempotency_key: idempotencyKey,
       cliente_nombre: clienteNombre.trim() ? clienteNombre.trim() : "Cliente casual",
       cliente_telefono: clienteTelefono.trim() ? clienteTelefono.trim() : "",
       observaciones: observaciones.trim() ? observaciones.trim() : "",
@@ -375,6 +385,9 @@ function POS() {
           numero_venta: response.operacion.numero_venta,
           total: response.total_bruto,
         });
+
+        // Regenerar idempotencyKey para la próxima venta
+        setIdempotencyKey(generarIdempotencyKey());
 
         // Limpiar el estado del checkout y el carrito
         setCarrito([]);
@@ -753,10 +766,10 @@ function POS() {
                   required
                 >
                   <option value="">Seleccionar...</option>
-                  <option value="efectivo">Efectivo</option>
-                  <option value="transferencia">Transferencia</option>
-                  <option value="tarjeta crédito">Tarjeta Crédito</option>
-                  <option value="tarjeta débito">Tarjeta Débito</option>
+                  <option value="Efectivo">Efectivo</option>
+                  <option value="Transferencia">Transferencia</option>
+                  <option value="Tarjeta Débito">Tarjeta Débito</option>
+                  <option value="Tarjeta Crédito">Tarjeta Crédito</option>
                   <option value="Addi">Addi</option>
                   <option value="Sistecrédito">Sistecrédito</option>
                 </select>
@@ -943,10 +956,10 @@ function POS() {
                     required
                   >
                     <option value="">Seleccionar...</option>
-                    <option value="efectivo">Efectivo</option>
-                    <option value="transferencia">Transferencia</option>
-                    <option value="tarjeta crédito">Tarjeta Crédito</option>
-                    <option value="tarjeta débito">Tarjeta Débito</option>
+                    <option value="Efectivo">Efectivo</option>
+                    <option value="Transferencia">Transferencia</option>
+                    <option value="Tarjeta Débito">Tarjeta Débito</option>
+                    <option value="Tarjeta Crédito">Tarjeta Crédito</option>
                     <option value="Addi">Addi</option>
                     <option value="Sistecrédito">Sistecrédito</option>
                   </select>
