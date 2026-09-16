@@ -635,6 +635,7 @@ export interface VentaOperacion {
   observaciones?: string | null;
   fecha_venta: string;
   fecha_registro: string;
+  es_legacy?: boolean;
 }
 
 export interface VentaCheckoutResponse {
@@ -658,6 +659,90 @@ export const registrarCheckoutVentaRequest = async (
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify(data),
+  });
+
+  return res.json();
+};
+
+export interface VentaOperacionListItem {
+  id: number;
+  numero_venta: string;
+  cliente_nombre?: string | null;
+  cliente_telefono?: string | null;
+  metodo_pago: string;
+  total_bruto: number;
+  costo_total: number;
+  utilidad_total: number;
+  cantidad_items: number;
+  origen: string;
+  observaciones?: string | null;
+  fecha_venta: string;
+  fecha_registro?: string | null;
+  es_legacy: boolean;
+}
+
+export interface HistorialVentasKPIs {
+  total_transacciones: number;
+  unidades_vendidas: number;
+  total_cobrado: number;
+  costos_directos: number;
+  utilidad_bruta: number;
+}
+
+export interface HistorialVentasResponse {
+  items: VentaOperacionListItem[];
+  total: number;
+  limit: number;
+  offset: number;
+  kpis: HistorialVentasKPIs;
+}
+
+export interface HistorialVentasFiltros {
+  fecha_desde?: string;
+  fecha_hasta?: string;
+  metodo_pago?: string;
+  buscar?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export const listarOperacionesPOSRequest = async (
+  filtros?: HistorialVentasFiltros
+): Promise<HistorialVentasResponse> => {
+  const token = localStorage.getItem("token");
+  const queryParams = new URLSearchParams();
+
+  if (filtros) {
+    if (filtros.fecha_desde) queryParams.append("fecha_desde", filtros.fecha_desde);
+    if (filtros.fecha_hasta) queryParams.append("fecha_hasta", filtros.fecha_hasta);
+    if (filtros.metodo_pago) queryParams.append("metodo_pago", filtros.metodo_pago);
+    if (filtros.buscar) queryParams.append("buscar", filtros.buscar);
+    if (filtros.limit !== undefined) queryParams.append("limit", filtros.limit.toString());
+    if (filtros.offset !== undefined) queryParams.append("offset", filtros.offset.toString());
+  }
+
+  const res = await fetch(`${API_URL}/ventas/operaciones?${queryParams.toString()}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return res.json();
+};
+
+export const obtenerOperacionPOSRequest = async (
+  operacionId: number,
+  esLegacy: boolean = false
+): Promise<VentaCheckoutResponse> => {
+  const token = localStorage.getItem("token");
+  const queryParams = esLegacy ? "?es_legacy=true" : "";
+
+  const res = await fetch(`${API_URL}/ventas/operaciones/${operacionId}${queryParams}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
   });
 
   return res.json();

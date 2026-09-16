@@ -8,6 +8,7 @@ import EncargosPage from "./pages/EncargosPage";
 import MensajesProveedores from "./pages/MensajesProveedores";
 import InventarioPage from "./pages/InventarioPage";
 import POSPage from "./pages/POSPage";
+import HistorialVentasPage from "./pages/HistorialVentasPage";
 import GastosPage from "./pages/GastosPage";
 
 import "./App.css";
@@ -97,6 +98,18 @@ function App() {
             )
           }
         />
+
+        <Route
+          path="/dashboard/ventas-historial"
+          element={
+            logueado ? (
+              <HistorialVentasPage />
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+
 
         <Route
           path="/dashboard/gastos"

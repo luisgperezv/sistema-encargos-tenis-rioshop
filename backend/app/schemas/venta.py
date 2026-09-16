@@ -135,9 +135,46 @@ class VentaOperacionResponse(BaseModel):
     observaciones: Optional[str] = None
     fecha_venta: datetime
     fecha_registro: datetime
+    es_legacy: bool = False
 
     class Config:
         from_attributes = True
+
+
+class VentaOperacionListItem(BaseModel):
+    id: int
+    numero_venta: str
+    cliente_nombre: Optional[str] = None
+    cliente_telefono: Optional[str] = None
+    metodo_pago: str
+    total_bruto: Decimal
+    costo_total: Decimal
+    utilidad_total: Decimal
+    cantidad_items: int
+    origen: str
+    observaciones: Optional[str] = None
+    fecha_venta: str
+    fecha_registro: Optional[str] = None
+    es_legacy: bool = False
+
+    class Config:
+        from_attributes = True
+
+
+class HistorialVentasKPIs(BaseModel):
+    total_transacciones: int
+    unidades_vendidas: int
+    total_cobrado: Decimal
+    costos_directos: Decimal
+    utilidad_bruta: Decimal
+
+
+class HistorialVentasResponse(BaseModel):
+    items: List[VentaOperacionListItem]
+    total: int
+    limit: int
+    offset: int
+    kpis: HistorialVentasKPIs
 
 
 class VentaCheckoutResponse(BaseModel):
