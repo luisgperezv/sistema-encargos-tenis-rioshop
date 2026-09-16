@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   listarEncargosRequest,
   actualizarEstadoEncargoRequest,
+  actualizarCostosEncargoRequest,
   agregarAbonoEncargoRequest,
   editarEncargoRequest,
   listarProveedoresRequest,
@@ -109,6 +110,7 @@ function ListarEncargos() {
   const [costoBaseInput, setCostoBaseInput] = useState("");
   const [costoEnvioInput, setCostoEnvioInput] = useState("");
   const [costoDespachadorInput, setCostoDespachadorInput] = useState("");
+  const [esEdicionCostos, setEsEdicionCostos] = useState(false);
 
   const [showCancelacionModal, setShowCancelacionModal] = useState(false);
   const [cancelacionEncargoId, setCancelacionEncargoId] = useState<number | null>(null);
@@ -181,6 +183,7 @@ function ListarEncargos() {
       setCostoBaseInput(encargo.costo_base !== null && encargo.costo_base !== undefined ? String(encargo.costo_base) : "");
       setCostoEnvioInput(encargo.costo_envio !== null && encargo.costo_envio !== undefined ? String(encargo.costo_envio) : "");
       setCostoDespachadorInput(encargo.costo_despachador !== null && encargo.costo_despachador !== undefined ? String(encargo.costo_despachador) : "");
+      setEsEdicionCostos(false);
       setShowCostoModal(true);
     } else if (nuevoEstado === "cancelado") {
       setCancelacionEncargoId(encargo.id);
@@ -207,6 +210,71 @@ function ListarEncargos() {
       setShowPagoModal(true);
     } else {
       cambiarEstado(encargo.id, nuevoEstado);
+    }
+  };
+
+  const abrirModalCostos = (encargo: any) => {
+    setModalEncargoId(encargo.id);
+    setCostoBaseInput(
+      encargo.costo_base !== null && encargo.costo_base !== undefined
+        ? String(encargo.costo_base)
+        : ""
+    );
+    setCostoEnvioInput(
+      encargo.costo_envio !== null && encargo.costo_envio !== undefined
+        ? String(encargo.costo_envio)
+        : ""
+    );
+    setCostoDespachadorInput(
+      encargo.costo_despachador !== null && encargo.costo_despachador !== undefined
+        ? String(encargo.costo_despachador)
+        : ""
+    );
+    setEsEdicionCostos(true);
+    setShowCostoModal(true);
+  };
+
+  const guardarCostosDirectos = async () => {
+    if (modalEncargoId === null) return;
+
+    const costoBase = Number(costoBaseInput);
+    const costoEnvio = Number(costoEnvioInput);
+    const costoDespachador = Number(costoDespachadorInput);
+
+    if (isNaN(costoBase) || costoBase < 0) {
+      alert("⚠️ El costo base debe ser un número mayor o igual a 0");
+      return;
+    }
+    if (isNaN(costoEnvio) || costoEnvio < 0) {
+      alert("⚠️ El costo de envío debe ser un número mayor o igual a 0");
+      return;
+    }
+    if (isNaN(costoDespachador) || costoDespachador < 0) {
+      alert("⚠️ El costo del despachador debe ser un número mayor o igual a 0");
+      return;
+    }
+
+    const costos = {
+      costo_base: costoBase,
+      costo_envio: costoEnvio,
+      costo_despachador: costoDespachador,
+    };
+
+    const respuesta = await actualizarCostosEncargoRequest(modalEncargoId, costos);
+
+    if (respuesta.id) {
+      setEncargos((prev) =>
+        prev.map((encargo) => (encargo.id === modalEncargoId ? respuesta : encargo))
+      );
+      setShowCostoModal(false);
+      setModalEncargoId(null);
+      setEsEdicionCostos(false);
+      setMensaje("✅ Costos actualizados correctamente sin alterar estado ni fechas");
+      setTimeout(() => setMensaje(""), 4000);
+    } else if (respuesta.detail) {
+      alert(respuesta.detail);
+    } else {
+      alert("Error al actualizar costos del encargo");
     }
   };
 
@@ -248,6 +316,7 @@ function ListarEncargos() {
       );
       setShowCostoModal(false);
       setModalEncargoId(null);
+      setEsEdicionCostos(false);
     } else if (respuesta.detail) {
       alert(respuesta.detail);
     } else {
@@ -258,6 +327,7 @@ function ListarEncargos() {
   const cancelarModalDespacho = () => {
     setShowCostoModal(false);
     setModalEncargoId(null);
+    setEsEdicionCostos(false);
   };
 
   const confirmarCancelacion = async () => {
@@ -793,8 +863,8 @@ function ListarEncargos() {
                 </div>
               </div>
 
-              {/* 6. COSTOS Y UTILIDAD (SI EXISTEN) */}
-              {Number(encargo.costo_total || 0) > 0 && (
+              {/* 6. COSTOS Y UTILIDAD */}
+              {Number(encargo.costo_total || 0) > 0 ? (
                 <div className="card-costos-box">
                   <div className="costos-mini">
                     <span>Base: ${encargo.costo_base}</span>
@@ -812,7 +882,44 @@ function ListarEncargos() {
                       Util: {formatearPesos(Number(encargo.utilidad_estimada || 0))}
                     </span>
                   </div>
+                  {encargo.estado !== "cancelado" && (
+                    <button
+                      className="btn btn-secondary"
+                      style={{
+                        marginTop: "6px",
+                        width: "100%",
+                        fontSize: "0.75rem",
+                        padding: "4px 8px",
+                        background: "rgba(245, 158, 11, 0.15)",
+                        border: "1px solid rgba(245, 158, 11, 0.4)",
+                        color: "var(--text-primary)",
+                      }}
+                      title="Modificar costos directos"
+                      onClick={() => abrirModalCostos(encargo)}
+                    >
+                      🏷️ Editar costos
+                    </button>
+                  )}
                 </div>
+              ) : (
+                encargo.estado !== "cancelado" && (
+                  <div style={{ marginBottom: "6px" }}>
+                    <button
+                      className="btn btn-secondary"
+                      style={{
+                        width: "100%",
+                        fontSize: "0.75rem",
+                        padding: "4px 8px",
+                        background: "rgba(245, 158, 11, 0.1)",
+                        border: "1px dashed rgba(245, 158, 11, 0.3)",
+                      }}
+                      title="Registrar costos directos"
+                      onClick={() => abrirModalCostos(encargo)}
+                    >
+                      🏷️ Asignar costos
+                    </button>
+                  </div>
+                )
               )}
 
               {/* FECHAS Y METADATA */}
@@ -942,7 +1049,11 @@ function ListarEncargos() {
       {showCostoModal && (
         <div className="costos-modal-overlay">
           <div className="costos-modal-content">
-            <h3>Registrar Costos (Encargo #{modalEncargoId})</h3>
+            <h3>
+              {esEdicionCostos
+                ? `Modificar Costos (Encargo #${modalEncargoId})`
+                : `Registrar Costos de Despacho (Encargo #${modalEncargoId})`}
+            </h3>
             <div className="costos-modal-inputs">
               <div className="modal-campo">
                 <label>Costo Base (Bodega):</label>
@@ -971,10 +1082,37 @@ function ListarEncargos() {
                   onChange={(e) => setCostoDespachadorInput(e.target.value)}
                 />
               </div>
+              <div
+                className="modal-campo"
+                style={{
+                  marginTop: "6px",
+                  padding: "8px 12px",
+                  backgroundColor: "rgba(245, 158, 11, 0.1)",
+                  border: "1px dashed rgba(245, 158, 11, 0.3)",
+                  borderRadius: "6px",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  fontSize: "0.88rem",
+                  fontWeight: "bold",
+                }}
+              >
+                <span>Costo Total Calculado:</span>
+                <span style={{ color: "#d97706" }}>
+                  {formatearPesos(
+                    (Number(costoBaseInput) || 0) +
+                      (Number(costoEnvioInput) || 0) +
+                      (Number(costoDespachadorInput) || 0)
+                  )}
+                </span>
+              </div>
             </div>
             <div className="modal-acciones">
-              <button className="btn btn-primary" onClick={confirmarDespacho}>
-                Confirmar Despacho
+              <button
+                className="btn btn-primary"
+                onClick={esEdicionCostos ? guardarCostosDirectos : confirmarDespacho}
+              >
+                {esEdicionCostos ? "Guardar Costos" : "Confirmar Despacho"}
               </button>
               <button className="btn btn-secondary" onClick={cancelarModalDespacho}>
                 Cancelar

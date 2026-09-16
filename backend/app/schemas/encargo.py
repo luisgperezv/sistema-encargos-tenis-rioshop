@@ -255,6 +255,19 @@ class EncargoAbonoUpdate(BaseModel):
     abono: float
 
 
+class EncargoCostosUpdate(BaseModel):
+    costo_base: float
+    costo_envio: float
+    costo_despachador: float
+
+    @field_validator("costo_base", "costo_envio", "costo_despachador")
+    @classmethod
+    def validar_no_negativo(cls, v: float) -> float:
+        if v < 0:
+            raise ValueError("El costo no puede ser negativo")
+        return v
+
+
 class EncargoResponse(BaseModel):
     id: int
     cliente_id: int

@@ -28,18 +28,20 @@ cloudinary.config(
     secure=True,
 )
 
-from datetime import date
+from datetime import date, datetime, timezone, timedelta
 from app.database import get_db
 from app.models.encargo import Encargo
 from app.models.cliente import Cliente
 from app.models.proveedor import Proveedor
 from app.models.mensaje_proveedor import MensajeProveedor
+from app.models.venta import Venta
 from app.schemas.encargo import (
     EncargoCreate,
     EncargoResponse,
     EncargoEstadoUpdate,
     EncargoAbonoUpdate,
     EncargoUpdate,
+    EncargoCostosUpdate,
 )
 
 router = APIRouter()
@@ -681,8 +683,12 @@ def actualizar_estado(
                 )
             encargo.metodo_pago = data.metodo_pago
 
-        if not encargo.fecha_entregado:
-            encargo.fecha_entregado = str(date.today())
+        # PROTECCIÓN DE INTEGRIDAD HISTÓRICA:
+        # Si ya tiene fecha_entregado, NUNCA se sobrescribe.
+        # Si está vacío o None, se asigna la fecha actual en zona Colombia (UTC-5).
+        if not encargo.fecha_entregado or not str(encargo.fecha_entregado).strip():
+            hoy_colombia = datetime.now(timezone(timedelta(hours=-5))).strftime("%Y-%m-%d")
+            encargo.fecha_entregado = hoy_colombia
 
     if data.estado == "cancelado":
         if not data.motivo_cancelacion or not data.motivo_cancelacion.strip():
@@ -802,5 +808,49 @@ def editar_encargo(
 
     db.commit()
     db.refresh(encargo)
+
+    return encargo
+
+
+@router.put("/encargos/{encargo_id}/costos", response_model=EncargoResponse)
+def actualizar_costos(
+    encargo_id: int,
+    data: EncargoCostosUpdate,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user),
+):
+    """
+    Actualiza exclusivamente los costos de un encargo y sincroniza con la venta asociada (si existe).
+    No modifica estado, fecha_entregado, fecha_despacho, precio, abono ni saldo.
+    Permitido para cualquier encargo, incluso en estado 'entregado'.
+    """
+    encargo = db.query(Encargo).filter(Encargo.id == encargo_id).first()
+    if not encargo:
+        raise HTTPException(status_code=404, detail="El encargo no existe")
+
+    # 1. Actualizar costos en el encargo y recalcular
+    costo_total = data.costo_base + data.costo_envio + data.costo_despachador
+    encargo.costo_base = data.costo_base
+    encargo.costo_envio = data.costo_envio
+    encargo.costo_despachador = data.costo_despachador
+    encargo.costo_total = costo_total
+    encargo.utilidad_estimada = (encargo.precio or 0.0) - costo_total
+
+    # 2. Sincronizar con la venta asociada (si existe) en la misma transacción
+    try:
+        venta_asociada = db.query(Venta).filter(Venta.encargo_id == encargo.id).first()
+        if venta_asociada:
+            venta_asociada.costo_base = data.costo_base
+            venta_asociada.costo_envio = data.costo_envio
+            venta_asociada.costo_despachador = data.costo_despachador
+            venta_asociada.costo_total = costo_total
+            subt = venta_asociada.subtotal if venta_asociada.subtotal is not None else (venta_asociada.precio_venta or encargo.precio or 0.0)
+            venta_asociada.utilidad = subt - costo_total
+
+        db.commit()
+        db.refresh(encargo)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al sincronizar costos: {str(e)}")
 
     return encargo

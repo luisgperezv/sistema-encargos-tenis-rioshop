@@ -197,6 +197,28 @@ export const actualizarEstadoEncargoRequest = async (
   return res.json();
 };
 
+export const actualizarCostosEncargoRequest = async (
+  encargoId: number,
+  costos: {
+    costo_base: number;
+    costo_envio: number;
+    costo_despachador: number;
+  }
+) => {
+  const token = localStorage.getItem("token");
+
+  const res = await fetch(`${API_URL}/encargos/${encargoId}/costos`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(costos),
+  });
+
+  return res.json();
+};
+
 export const agregarAbonoEncargoRequest = async (
   encargoId: number,
   abono: number
