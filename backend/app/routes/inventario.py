@@ -1,13 +1,15 @@
 from datetime import datetime
 from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import or_, func
 from app.core.security import get_current_user
 from app.database import get_db
 from app.models.inventario import Inventario
 from app.models.inventario_talla import InventarioTalla
 from app.models.inventario_talla_lote import InventarioTallaLote
+from app.models.venta_lote_consumo import VentaLoteConsumo
+from app.models.venta import Venta
 from app.services.utils import normalizar_texto
 from app.schemas.inventario import (
     InventarioCreate,
@@ -15,6 +17,12 @@ from app.schemas.inventario import (
     InventarioResponse,
     EntradaStockCreate,
     EntradaStockResponse,
+    InventarioMovimientosResponse,
+    ProductoMovimientosHeader,
+    ResumenTallaMovimiento,
+    CapaActivaItem,
+    LoteMovimientoItem,
+    ConsumoSalidaItem,
     MAPPING_TALLAS,
 )
 
@@ -437,4 +445,179 @@ def eliminar_item_inventario(
     db.delete(item)
     db.commit()
     return {"mensaje": "Artículo eliminado correctamente del inventario"}
+
+
+@router.get("/inventario/{inventario_id}/movimientos", response_model=InventarioMovimientosResponse)
+def obtener_movimientos_inventario(
+    inventario_id: int,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user),
+):
+    """
+    Endpoint de solo lectura para consultar la trazabilidad completa de inventario:
+    - Resumen por Talla con capas activas de costo.
+    - Historial de Lotes / Reposiciones cronológico con cálculo de valor inicial y disponible.
+    - Desglose de ventas/salidas por lote, identificando claramente ventas completadas y anuladas/reintegradas.
+    - Carga eager para evitar consultas N+1.
+    """
+    item = (
+        db.query(Inventario)
+        .options(
+            selectinload(Inventario.tallas)
+            .selectinload(InventarioTalla.lotes)
+            .selectinload(InventarioTallaLote.consumos)
+            .selectinload(VentaLoteConsumo.venta)
+            .selectinload(Venta.operacion)
+        )
+        .filter(Inventario.id == inventario_id)
+        .first()
+    )
+
+    if not item:
+        raise HTTPException(status_code=404, detail="El artículo de inventario no existe")
+
+    resumen_tallas: list[ResumenTallaMovimiento] = []
+    historial_lotes: list[LoteMovimientoItem] = []
+
+    total_stock = 0
+    valor_inventario_total = Decimal("0.00")
+
+    # Ordenar tallas por mapeo EUR canónico
+    tallas_ordenadas = sorted(
+        item.tallas,
+        key=lambda t: list(MAPPING_TALLAS.keys()).index(t.talla_eur) if t.talla_eur in MAPPING_TALLAS else 999,
+    )
+
+    for talla in tallas_ordenadas:
+        stock_talla = talla.cantidad or 0
+        total_stock += stock_talla
+
+        valor_stock_talla = Decimal("0.00")
+        capas_activas: list[CapaActivaItem] = []
+
+        # Ordenar lotes de la talla cronológicamente por fecha_ingreso e id
+        lotes_talla = sorted(talla.lotes, key=lambda l: (l.fecha_ingreso, l.id))
+        for lote in lotes_talla:
+            c_unit = Decimal(str(lote.costo_unitario or Decimal("0.00")))
+            disp = lote.cantidad_disponible or 0
+            if disp > 0:
+                val_capa = Decimal(disp) * c_unit
+                valor_stock_talla += val_capa
+                capas_activas.append(
+                    CapaActivaItem(
+                        lote_id=lote.id,
+                        cantidad_disponible=disp,
+                        costo_unitario=c_unit,
+                        fecha_ingreso=lote.fecha_ingreso or "",
+                    )
+                )
+
+        valor_inventario_total += valor_stock_talla
+
+        resumen_tallas.append(
+            ResumenTallaMovimiento(
+                talla_id=talla.id,
+                talla_eur=talla.talla_eur,
+                talla_col=talla.talla_col,
+                stock_actual=stock_talla,
+                valor_stock=valor_stock_talla,
+                capas_activas=capas_activas,
+            )
+        )
+
+        # Extraer lotes de esta talla para el historial consolidado
+        for lote in lotes_talla:
+            c_unit = Decimal(str(lote.costo_unitario or Decimal("0.00")))
+            c_ini = lote.cantidad_inicial or 0
+            c_disp = lote.cantidad_disponible or 0
+            consumido_neto = max(0, c_ini - c_disp)
+            val_ini = Decimal(c_ini) * c_unit
+            val_disp = Decimal(c_disp) * c_unit
+            estado_lote = "activo" if c_disp > 0 else "agotado"
+
+            # Salidas / consumos asociados a este lote
+            salidas: list[ConsumoSalidaItem] = []
+            consumos_ordenados = sorted(
+                lote.consumos,
+                key=lambda c: (c.fecha_registro or datetime.min, c.id),
+                reverse=True,
+            )
+
+            for cons in consumos_ordenados:
+                v = cons.venta
+                num_v = ""
+                cli_nombre = None
+                est_v = "completada"
+                f_anul = None
+                m_anul = None
+                f_venta = None
+
+                if v:
+                    f_venta = v.fecha_venta
+                    est_v = v.estado or "completada"
+                    if v.fecha_anulacion:
+                        f_anul = v.fecha_anulacion.isoformat()
+                    m_anul = v.motivo_anulacion
+                    if v.operacion:
+                        num_v = v.operacion.numero_venta or f"POS-{v.operacion.id}"
+                        cli_nombre = v.operacion.cliente_nombre
+                    else:
+                        num_v = f"V-DIR-{v.id}"
+                        cli_nombre = v.cliente_nombre or "Cliente casual"
+                else:
+                    num_v = f"VENTA-{cons.venta_id}"
+
+                salidas.append(
+                    ConsumoSalidaItem(
+                        consumo_id=cons.id,
+                        venta_id=cons.venta_id,
+                        numero_venta=num_v,
+                        cantidad=cons.cantidad,
+                        costo_unitario=Decimal(str(cons.costo_unitario or c_unit)),
+                        costo_total=Decimal(str(cons.costo_total or (Decimal(cons.cantidad) * c_unit))),
+                        cliente_nombre=cli_nombre,
+                        fecha_venta=f_venta,
+                        estado_venta=est_v,
+                        fecha_anulacion=f_anul,
+                        motivo_anulacion=m_anul,
+                    )
+                )
+
+            historial_lotes.append(
+                LoteMovimientoItem(
+                    lote_id=lote.id,
+                    fecha_ingreso=lote.fecha_ingreso or "",
+                    fecha_registro=lote.fecha_registro,
+                    talla_eur=talla.talla_eur,
+                    talla_col=talla.talla_col,
+                    cantidad_inicial=c_ini,
+                    cantidad_disponible=c_disp,
+                    cantidad_consumida_neta=consumido_neto,
+                    costo_unitario=c_unit,
+                    valor_inicial=val_ini,
+                    valor_disponible=val_disp,
+                    estado=estado_lote,
+                    observaciones=lote.observaciones,
+                    salidas=salidas,
+                )
+            )
+
+    # Ordenar historial de lotes por fecha_ingreso descendente, desempate por lote_id desc
+    historial_lotes.sort(key=lambda l: (l.fecha_ingreso, l.lote_id), reverse=True)
+
+    header = ProductoMovimientosHeader(
+        id=item.id,
+        marca=item.marca,
+        referencia=item.referencia,
+        foto=item.foto,
+        precio_sugerido=Decimal(str(item.precio_sugerido or 0.0)),
+        stock_total=total_stock,
+        valor_inventario_total=valor_inventario_total,
+    )
+
+    return InventarioMovimientosResponse(
+        producto=header,
+        resumen_tallas=resumen_tallas,
+        historial_lotes=historial_lotes,
+    )
 

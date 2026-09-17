@@ -518,6 +518,85 @@ export const registrarEntradaStockRequest = async (
   return res.json();
 };
 
+export interface ConsumoSalidaItem {
+  consumo_id: number;
+  venta_id: number;
+  numero_venta: string;
+  cantidad: number;
+  costo_unitario: number;
+  costo_total: number;
+  cliente_nombre?: string | null;
+  fecha_venta?: string | null;
+  estado_venta: string; // 'completada' | 'anulada'
+  fecha_anulacion?: string | null;
+  motivo_anulacion?: string | null;
+}
+
+export interface LoteMovimientoItem {
+  lote_id: number;
+  fecha_ingreso: string;
+  fecha_registro?: string | null;
+  talla_eur: string;
+  talla_col: string;
+  cantidad_inicial: number;
+  cantidad_disponible: number;
+  cantidad_consumida_neta: number;
+  costo_unitario: number;
+  valor_inicial: number;
+  valor_disponible: number;
+  estado: "activo" | "agotado";
+  observaciones?: string | null;
+  salidas: ConsumoSalidaItem[];
+}
+
+export interface CapaActivaItem {
+  lote_id: number;
+  cantidad_disponible: number;
+  costo_unitario: number;
+  fecha_ingreso: string;
+}
+
+export interface ResumenTallaMovimiento {
+  talla_id: number;
+  talla_eur: string;
+  talla_col: string;
+  stock_actual: number;
+  valor_stock: number;
+  capas_activas: CapaActivaItem[];
+}
+
+export interface ProductoMovimientosHeader {
+  id: number;
+  marca: string;
+  referencia: string;
+  foto?: string | null;
+  precio_sugerido: number;
+  stock_total: number;
+  valor_inventario_total: number;
+}
+
+export interface InventarioMovimientosResponse {
+  producto: ProductoMovimientosHeader;
+  resumen_tallas: ResumenTallaMovimiento[];
+  historial_lotes: LoteMovimientoItem[];
+  detail?: string;
+}
+
+export const obtenerMovimientosInventarioRequest = async (
+  inventarioId: number
+): Promise<InventarioMovimientosResponse> => {
+  const token = localStorage.getItem("token");
+
+  const res = await fetch(`${API_URL}/inventario/${inventarioId}/movimientos`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return res.json();
+};
+
 export interface Venta {
 
   id: number;

@@ -283,3 +283,66 @@ class EntradaStockResponse(BaseModel):
     lotes_creados: int
     total_unidades_ingresadas: int
     tallas_actualizadas: list[InventarioTallaResponse]
+
+
+class ConsumoSalidaItem(BaseModel):
+    consumo_id: int
+    venta_id: int
+    numero_venta: str
+    cantidad: int
+    costo_unitario: Decimal
+    costo_total: Decimal
+    cliente_nombre: Optional[str] = None
+    fecha_venta: Optional[str] = None
+    estado_venta: str  # "completada" o "anulada"
+    fecha_anulacion: Optional[str] = None
+    motivo_anulacion: Optional[str] = None
+
+
+class LoteMovimientoItem(BaseModel):
+    lote_id: int
+    fecha_ingreso: str
+    fecha_registro: Optional[datetime] = None
+    talla_eur: str
+    talla_col: str
+    cantidad_inicial: int
+    cantidad_disponible: int
+    cantidad_consumida_neta: int
+    costo_unitario: Decimal
+    valor_inicial: Decimal
+    valor_disponible: Decimal
+    estado: str  # "activo" | "agotado"
+    observaciones: Optional[str] = None
+    salidas: list[ConsumoSalidaItem] = []
+
+
+class CapaActivaItem(BaseModel):
+    lote_id: int
+    cantidad_disponible: int
+    costo_unitario: Decimal
+    fecha_ingreso: str
+
+
+class ResumenTallaMovimiento(BaseModel):
+    talla_id: int
+    talla_eur: str
+    talla_col: str
+    stock_actual: int
+    valor_stock: Decimal
+    capas_activas: list[CapaActivaItem] = []
+
+
+class ProductoMovimientosHeader(BaseModel):
+    id: int
+    marca: str
+    referencia: str
+    foto: Optional[str] = None
+    precio_sugerido: Decimal
+    stock_total: int
+    valor_inventario_total: Decimal
+
+
+class InventarioMovimientosResponse(BaseModel):
+    producto: ProductoMovimientosHeader
+    resumen_tallas: list[ResumenTallaMovimiento]
+    historial_lotes: list[LoteMovimientoItem]

@@ -9,7 +9,8 @@ import {
   obtenerSugerenciasReferenciasRequest,
   registrarEntradaStockRequest,
 } from "../services/api";
-import { PlusCircle, Edit, Trash2, Search, Image as ImageIcon, Plus, PackagePlus } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Search, Image as ImageIcon, Plus, PackagePlus, History } from "lucide-react";
+import { ModalMovimientosInventario } from "./ModalMovimientosInventario";
 import "./Inventario.css";
 
 
@@ -187,6 +188,9 @@ function Inventario() {
   const [observacionesReponer, setObservacionesReponer] = useState("");
   const [filasReponer, setFilasReponer] = useState<EntradaTallaFila[]>([]);
   const [errorReponer, setErrorReponer] = useState("");
+
+  // Modal Movimientos y Lotes
+  const [modalMovimientosId, setModalMovimientosId] = useState<number | null>(null);
 
   // Formulario
   const [marcaInput, setMarcaInput] = useState("");
@@ -823,6 +827,14 @@ function Inventario() {
                       <PackagePlus size={16} />
                       <span>Reponer</span>
                     </button>
+                    <button
+                      className="btn-accion btn-movimientos"
+                      onClick={() => setModalMovimientosId(item.id)}
+                      title="Ver capas de costo, reposiciones y trazabilidad de lotes FIFO"
+                    >
+                      <History size={16} />
+                      <span>Movimientos</span>
+                    </button>
                     <button className="btn-accion btn-edit" onClick={() => abrirEditar(item)}>
                       <Edit size={16} />
                       <span>Editar</span>
@@ -1252,6 +1264,14 @@ function Inventario() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Modal de Movimientos y Lotes FIFO */}
+      {modalMovimientosId !== null && (
+        <ModalMovimientosInventario
+          inventarioId={modalMovimientosId}
+          onClose={() => setModalMovimientosId(null)}
+        />
       )}
     </div>
   );
