@@ -10,8 +10,11 @@ from app.models import inventario
 from app.models import inventario_talla
 from app.models import venta_operacion
 from app.models import gasto
+from app.models import inventario_talla_lote
+from app.models import venta_lote_consumo
 
 from app.routes import cliente as cliente_router
+
 from app.routes import encargo as encargo_router
 from app.routes import proveedor as proveedor_router
 from app.routes import mensaje_proveedor as mensaje_proveedor_router
@@ -363,8 +366,52 @@ def ejecutar_migraciones_ligeras():
         except Exception as alter_err:
             db.rollback()
             logging.warning(f"[MIGRACIÓN WARNING] No se pudo agregar la columna idempotency_key automáticamente: {str(alter_err)}.")
-                
+
+    # 10. Verificar/crear tablas de lotes FIFO y migración inicial idempotente
+    try:
+        from app.models.inventario_talla_lote import InventarioTallaLote
+        from app.models.venta_lote_consumo import VentaLoteConsumo
+        from app.models.inventario import Inventario
+        from app.models.inventario_talla import InventarioTalla
+        from decimal import Decimal
+
+        Base.metadata.create_all(bind=engine)
+
+        tallas_con_stock = db.query(InventarioTalla).filter(InventarioTalla.cantidad > 0).all()
+        lotes_creados_count = 0
+
+        for t in tallas_con_stock:
+            lote_existente = db.query(InventarioTallaLote).filter(
+                InventarioTallaLote.inventario_talla_id == t.id
+            ).first()
+
+            if not lote_existente:
+                prod = db.query(Inventario).filter(Inventario.id == t.inventario_id).first()
+                costo_val = Decimal(str(prod.costo or 0.0)) if prod else Decimal("0.0")
+                fecha_val = prod.fecha_ingreso if prod and prod.fecha_ingreso else datetime.utcnow().strftime("%Y-%m-%d")
+
+                nuevo_lote = InventarioTallaLote(
+                    inventario_talla_id=t.id,
+                    costo_unitario=costo_val,
+                    cantidad_inicial=t.cantidad,
+                    cantidad_disponible=t.cantidad,
+                    fecha_ingreso=fecha_val,
+                    observaciones="Stock inicial migrado",
+                )
+                db.add(nuevo_lote)
+                lotes_creados_count += 1
+
+        if lotes_creados_count > 0:
+            db.commit()
+            print(f"[MIGRACIÓN] Se crearon {lotes_creados_count} lotes iniciales para existencias actuales.", flush=True)
+        else:
+            print("[MIGRACIÓN] Lotes FIFO al día. No se requirieron nuevos lotes iniciales.", flush=True)
+    except Exception as lotes_err:
+        db.rollback()
+        logging.warning(f"[MIGRACIÓN WARNING] Error en inicialización de lotes FIFO: {str(lotes_err)}")
+
     db.close()
+
 
 
 ejecutar_migraciones_ligeras()

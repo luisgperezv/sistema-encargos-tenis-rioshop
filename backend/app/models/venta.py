@@ -55,3 +55,4 @@ class Venta(Base):
     inventario = relationship("Inventario")
     inventario_talla = relationship("InventarioTalla")
     operacion = relationship("VentaOperacion", back_populates="detalles")
+    lote_consumos = relationship("VentaLoteConsumo", back_populates="venta", cascade="all, delete-orphan")

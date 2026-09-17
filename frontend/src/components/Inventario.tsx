@@ -7,9 +7,11 @@ import {
   subirImagenRequest,
   obtenerSugerenciasMarcasRequest,
   obtenerSugerenciasReferenciasRequest,
+  registrarEntradaStockRequest,
 } from "../services/api";
-import { PlusCircle, Edit, Trash2, Search, Image as ImageIcon, Plus } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Search, Image as ImageIcon, Plus, PackagePlus } from "lucide-react";
 import "./Inventario.css";
+
 
 type TallaInventario = {
   id: number;
@@ -46,6 +48,14 @@ type TallaFormItem = {
   talla_col: string;
   cantidad: number;
   esNueva?: boolean;
+};
+
+type EntradaTallaFila = {
+  key: string;
+  talla_eur: string;
+  talla_col: string;
+  cantidad: number;
+  costo_unitario: number;
 };
 
 const formatearPesos = (valor: number) => {
@@ -167,6 +177,16 @@ function Inventario() {
   // Modales
   const [showFormModal, setShowFormModal] = useState(false);
   const [articuloEditando, setArticuloEditando] = useState<ArticuloInventario | null>(null);
+
+  // Modal Reponer Stock
+  const [showReponerModal, setShowReponerModal] = useState(false);
+  const [articuloReponiendo, setArticuloReponiendo] = useState<ArticuloInventario | null>(null);
+  const [fechaIngresoReponer, setFechaIngresoReponer] = useState(
+    new Date().toISOString().split("T")[0]
+  );
+  const [observacionesReponer, setObservacionesReponer] = useState("");
+  const [filasReponer, setFilasReponer] = useState<EntradaTallaFila[]>([]);
+  const [errorReponer, setErrorReponer] = useState("");
 
   // Formulario
   const [marcaInput, setMarcaInput] = useState("");
@@ -524,6 +544,121 @@ function Inventario() {
     }
   };
 
+  const abrirReponer = (item: ArticuloInventario) => {
+    setArticuloReponiendo(item);
+    setFechaIngresoReponer(new Date().toISOString().split("T")[0]);
+    setObservacionesReponer("");
+    setErrorReponer("");
+
+    const primerTalla = item.tallas && item.tallas.length > 0 ? item.tallas[0].talla_eur : "40H";
+    const primerCol = MAPPING_TALLAS[primerTalla] || "38";
+
+    setFilasReponer([
+      {
+        key: "fila-" + Date.now(),
+        talla_eur: primerTalla,
+        talla_col: primerCol,
+        cantidad: 1,
+        costo_unitario: item.costo || 0,
+      },
+    ]);
+    setShowReponerModal(true);
+  };
+
+  const agregarFilaReponer = () => {
+    const defaultEur = "40H";
+    const defaultCol = MAPPING_TALLAS[defaultEur] || "38";
+    setFilasReponer((prev) => [
+      ...prev,
+      {
+        key: "fila-" + Date.now() + "-" + Math.random(),
+        talla_eur: defaultEur,
+        talla_col: defaultCol,
+        cantidad: 1,
+        costo_unitario: articuloReponiendo?.costo || 0,
+      },
+    ]);
+  };
+
+  const eliminarFilaReponer = (key: string) => {
+    if (filasReponer.length <= 1) return;
+    setFilasReponer((prev) => prev.filter((f) => f.key !== key));
+  };
+
+  const handleReponerTallaChange = (key: string, eur: string) => {
+    const col = MAPPING_TALLAS[eur] || "";
+    setFilasReponer((prev) =>
+      prev.map((f) => (f.key === key ? { ...f, talla_eur: eur, talla_col: col } : f))
+    );
+  };
+
+  const handleReponerCantidadChange = (key: string, val: string) => {
+    const num = parseInt(val, 10);
+    setFilasReponer((prev) =>
+      prev.map((f) => (f.key === key ? { ...f, cantidad: isNaN(num) ? 0 : Math.max(0, num) } : f))
+    );
+  };
+
+  const handleReponerCostoChange = (key: string, val: string) => {
+    const num = parseFloat(val);
+    setFilasReponer((prev) =>
+      prev.map((f) => (f.key === key ? { ...f, costo_unitario: isNaN(num) ? 0 : Math.max(0, num) } : f))
+    );
+  };
+
+  const guardarEntradaStock = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!articuloReponiendo) return;
+    setErrorReponer("");
+
+    if (filasReponer.length === 0) {
+      setErrorReponer("Debe ingresar al menos una talla para reponer.");
+      return;
+    }
+
+    for (const f of filasReponer) {
+      if (!f.talla_eur.trim()) {
+        setErrorReponer("Todas las filas deben tener una talla asignada.");
+        return;
+      }
+      if (f.cantidad <= 0) {
+        setErrorReponer(`La cantidad para la talla ${f.talla_eur} debe ser mayor a cero.`);
+        return;
+      }
+      if (f.costo_unitario < 0) {
+        setErrorReponer(`El costo unitario para la talla ${f.talla_eur} no puede ser negativo.`);
+        return;
+      }
+    }
+
+    try {
+      setCargando(true);
+      const payload = {
+        fecha_ingreso: fechaIngresoReponer || new Date().toISOString().split("T")[0],
+        observaciones: observacionesReponer.trim() || undefined,
+        items: filasReponer.map((f) => ({
+          talla_eur: f.talla_eur.trim(),
+          cantidad: Number(f.cantidad),
+          costo_unitario: Number(f.costo_unitario),
+        })),
+      };
+
+      const res = await registrarEntradaStockRequest(articuloReponiendo.id, payload);
+      if (res && res.inventario_id) {
+        setShowReponerModal(false);
+        setMensaje(`✅ Entrada registrada exitosamente: +${res.total_unidades_ingresadas} pares en ${articuloReponiendo.marca} - ${articuloReponiendo.referencia}.`);
+        cargarInventario();
+      } else {
+        setErrorReponer(res?.detail || "Error al registrar la entrada de stock.");
+      }
+    } catch (err: any) {
+      console.error(err);
+      setErrorReponer(err.message || "Error al conectar con el servidor.");
+    } finally {
+      setCargando(false);
+    }
+  };
+
   return (
     <div className="inventario-container">
       <div className="inventario-header-section">
@@ -680,6 +815,14 @@ function Inventario() {
                   )}
 
                   <div className="card-acciones">
+                    <button
+                      className="btn-accion btn-reponer"
+                      onClick={() => abrirReponer(item)}
+                      title="Ingresar o reponer stock con costo real"
+                    >
+                      <PackagePlus size={16} />
+                      <span>Reponer</span>
+                    </button>
                     <button className="btn-accion btn-edit" onClick={() => abrirEditar(item)}>
                       <Edit size={16} />
                       <span>Editar</span>
@@ -942,6 +1085,168 @@ function Inventario() {
                 </button>
                 <button type="submit" className="btn-primario" disabled={cargando}>
                   {articuloEditando ? "Guardar Cambios" : "Crear Producto"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Reponer / Ingresar Stock */}
+      {showReponerModal && articuloReponiendo && (
+        <div className="modal-overlay">
+          <div className="modal-content modal-reponer">
+            <div className="modal-header">
+              <div>
+                <h2>Ingresar / Reponer Stock</h2>
+                <p className="modal-subtitulo-reponer">
+                  {articuloReponiendo.marca} — {articuloReponiendo.referencia} (#Inv-{articuloReponiendo.id})
+                </p>
+              </div>
+              <button className="modal-close-btn" onClick={() => setShowReponerModal(false)}>
+                &times;
+              </button>
+            </div>
+
+            <form onSubmit={guardarEntradaStock} className="modal-form">
+              {errorReponer && <div className="error-mensaje">{errorReponer}</div>}
+
+              <div className="form-grid">
+                <div className="form-group">
+                  <label>Fecha de Ingreso *</label>
+                  <input
+                    type="date"
+                    value={fechaIngresoReponer}
+                    onChange={(e) => setFechaIngresoReponer(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Observaciones (Opcional)</label>
+                  <input
+                    type="text"
+                    placeholder="Ej: Lote proveedor Medellín, pedido #14"
+                    value={observacionesReponer}
+                    onChange={(e) => setObservacionesReponer(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group full-width tallas-seccion">
+                  <div className="tallas-header">
+                    <div>
+                      <label>Tallas, Cantidades y Costos de Entrada</label>
+                      <p className="tallas-helper">
+                        Cada fila creará un lote con su propio costo unitario para consumo FIFO.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-agregar-talla"
+                      onClick={agregarFilaReponer}
+                    >
+                      <Plus size={16} />
+                      <span>Agregar Talla</span>
+                    </button>
+                  </div>
+
+                  <div className="tallas-lista">
+                    {filasReponer.map((fila) => (
+                      <div key={fila.key} className="talla-fila fila-reponer">
+                        <div className="talla-campo">
+                          <label>Talla EUR</label>
+                          <select
+                            value={fila.talla_eur}
+                            onChange={(e) => handleReponerTallaChange(fila.key, e.target.value)}
+                          >
+                            {OPCIONES_TALLA_EUR.map((eur) => (
+                              <option key={eur} value={eur}>
+                                EUR {eur} (COL {MAPPING_TALLAS[eur] || "?"})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="talla-campo">
+                          <label>Talla COL</label>
+                          <input
+                            type="text"
+                            value={fila.talla_col}
+                            readOnly
+                            className="input-disabled"
+                          />
+                        </div>
+
+                        <div className="talla-campo">
+                          <label>Cantidad</label>
+                          <input
+                            type="number"
+                            min="1"
+                            placeholder="1"
+                            value={fila.cantidad || ""}
+                            onChange={(e) => handleReponerCantidadChange(fila.key, e.target.value)}
+                            required
+                          />
+                        </div>
+
+                        <div className="talla-campo">
+                          <label>Costo Unitario (COP)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="100"
+                            placeholder="Ej: 85000"
+                            value={fila.costo_unitario || ""}
+                            onChange={(e) => handleReponerCostoChange(fila.key, e.target.value)}
+                            required
+                          />
+                        </div>
+
+                        {filasReponer.length > 1 && (
+                          <button
+                            type="button"
+                            className="btn-eliminar-talla"
+                            onClick={() => eliminarFilaReponer(fila.key)}
+                            title="Eliminar fila"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Resumen de la entrada */}
+              <div className="reponer-totales-bar">
+                <div className="total-reponer-item">
+                  <span>Pares a ingresar:</span>
+                  <strong>{filasReponer.reduce((s, f) => s + (Number(f.cantidad) || 0), 0)} und.</strong>
+                </div>
+                <div className="total-reponer-item">
+                  <span>Costo total entrada:</span>
+                  <strong>
+                    {formatearPesos(
+                      filasReponer.reduce(
+                        (s, f) => s + (Number(f.cantidad) || 0) * (Number(f.costo_unitario) || 0),
+                        0
+                      )
+                    )}
+                  </strong>
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn-secundario"
+                  onClick={() => setShowReponerModal(false)}
+                >
+                  Cancelar
+                </button>
+                <button type="submit" className="btn-primario" disabled={cargando}>
+                  {cargando ? "Registrando..." : "Registrar Entrada de Stock"}
                 </button>
               </div>
             </form>

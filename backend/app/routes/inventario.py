@@ -1,3 +1,5 @@
+from datetime import datetime
+from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, func
@@ -5,15 +7,19 @@ from app.core.security import get_current_user
 from app.database import get_db
 from app.models.inventario import Inventario
 from app.models.inventario_talla import InventarioTalla
+from app.models.inventario_talla_lote import InventarioTallaLote
 from app.services.utils import normalizar_texto
 from app.schemas.inventario import (
     InventarioCreate,
     InventarioUpdate,
     InventarioResponse,
+    EntradaStockCreate,
+    EntradaStockResponse,
     MAPPING_TALLAS,
 )
 
 router = APIRouter()
+
 
 
 def actualizar_estado_y_campos_compatibilidad(
@@ -199,6 +205,22 @@ def crear_item_inventario(
     actualizar_estado_y_campos_compatibilidad(nuevo_item, data.estado)
 
     db.add(nuevo_item)
+    db.flush()
+
+    # Crear lotes iniciales para las tallas con stock > 0
+    for t_db in nuevo_item.tallas:
+        if t_db.cantidad > 0:
+            lote = InventarioTallaLote(
+                inventario_talla_id=t_db.id,
+                costo_unitario=Decimal(str(nuevo_item.costo or 0.0)),
+                cantidad_inicial=t_db.cantidad,
+                cantidad_disponible=t_db.cantidad,
+                fecha_ingreso=nuevo_item.fecha_ingreso,
+                observaciones="Stock inicial del producto",
+                fecha_registro=datetime.utcnow(),
+            )
+            db.add(lote)
+
     db.commit()
     db.refresh(nuevo_item)
     return nuevo_item
@@ -226,12 +248,12 @@ def actualizar_item_inventario(
     existente = db.query(Inventario).filter(
         Inventario.marca_normalizada == m_norm,
         Inventario.referencia_normalizada == r_norm,
-        Inventario.id != inventario_id
+        Inventario.id != inventario_id,
     ).first()
     if existente:
         raise HTTPException(
             status_code=400,
-            detail="Ya existe otro producto registrado con esta combinación de Marca y Referencia."
+            detail="Ya existe otro producto registrado con esta combinación de Marca y Referencia.",
         )
 
     # Actualizar campos recibidos
@@ -254,20 +276,75 @@ def actualizar_item_inventario(
     if data.observaciones is not None:
         item.observaciones = data.observaciones
 
-    # Reemplazar la lista de tallas si se envió
+    # Sincronización NO DESTRUCTIVA de tallas (sin usar item.tallas.clear())
     if data.tallas is not None:
-        item.tallas.clear()
+        tallas_existentes = {t.talla_eur: t for t in item.tallas}
+        tallas_enviadas_eur = set()
 
-        tallas_db = []
         for t in data.tallas:
-            t_col = MAPPING_TALLAS.get(t.talla_eur, "38")
-            t_db = InventarioTalla(
-                talla_eur=t.talla_eur,
-                talla_col=t_col,
-                cantidad=t.cantidad,
-            )
-            tallas_db.append(t_db)
-        item.tallas = tallas_db
+            t_eur = t.talla_eur.strip()
+            tallas_enviadas_eur.add(t_eur)
+
+            if t_eur in tallas_existentes:
+                t_db = tallas_existentes[t_eur]
+                if t.cantidad > t_db.cantidad:
+                    # Incremento manual: crear lote para la diferencia
+                    dif = t.cantidad - t_db.cantidad
+                    costo_lote = Decimal(str(item.costo or 0.0))
+                    fecha_lote = item.fecha_ingreso or datetime.utcnow().strftime("%Y-%m-%d")
+                    nuevo_lote = InventarioTallaLote(
+                        inventario_talla_id=t_db.id,
+                        costo_unitario=costo_lote,
+                        cantidad_inicial=dif,
+                        cantidad_disponible=dif,
+                        fecha_ingreso=fecha_lote,
+                        observaciones="Ajuste manual de stock",
+                        fecha_registro=datetime.utcnow(),
+                    )
+                    db.add(nuevo_lote)
+                elif t.cantidad < t_db.cantidad:
+                    # Disminución manual: descontar de lotes disponibles más recientes
+                    dif = t_db.cantidad - t.cantidad
+                    lotes_rev = sorted(t_db.lotes, key=lambda l: (l.fecha_ingreso, l.id), reverse=True)
+                    for l in lotes_rev:
+                        if dif <= 0:
+                            break
+                        red = min(l.cantidad_disponible, dif)
+                        l.cantidad_disponible -= red
+                        dif -= red
+                t_db.cantidad = t.cantidad
+            else:
+                # Talla nueva agregada en edición
+                t_col = MAPPING_TALLAS.get(t_eur, "38")
+                t_db = InventarioTalla(
+                    inventario_id=item.id,
+                    talla_eur=t_eur,
+                    talla_col=t_col,
+                    cantidad=t.cantidad,
+                )
+                db.add(t_db)
+                db.flush()
+                item.tallas.append(t_db)
+                if t.cantidad > 0:
+                    costo_lote = Decimal(str(item.costo or 0.0))
+                    fecha_lote = item.fecha_ingreso or datetime.utcnow().strftime("%Y-%m-%d")
+                    nuevo_lote = InventarioTallaLote(
+                        inventario_talla_id=t_db.id,
+                        costo_unitario=costo_lote,
+                        cantidad_inicial=t.cantidad,
+                        cantidad_disponible=t.cantidad,
+                        fecha_ingreso=fecha_lote,
+                        observaciones="Stock inicial de nueva talla",
+                        fecha_registro=datetime.utcnow(),
+                    )
+                    db.add(nuevo_lote)
+
+        # Tallas que existían pero no fueron enviadas: marcar stock 0 para no romper referencias
+        for t_eur, t_db in tallas_existentes.items():
+            if t_eur not in tallas_enviadas_eur:
+                t_db.cantidad = 0
+                for l in t_db.lotes:
+                    l.cantidad_disponible = 0
 
     # Calcular estados y rellenar columnas heredadas
     actualizar_estado_y_campos_compatibilidad(item, data.estado)
@@ -275,6 +352,74 @@ def actualizar_item_inventario(
     db.commit()
     db.refresh(item)
     return item
+
+
+@router.post("/inventario/{inventario_id}/entradas", response_model=EntradaStockResponse)
+def registrar_entrada_stock(
+    inventario_id: int,
+    data: EntradaStockCreate,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user),
+):
+    item = db.query(Inventario).filter(Inventario.id == inventario_id).with_for_update().first()
+    if not item:
+        raise HTTPException(status_code=404, detail="El artículo de inventario no existe")
+
+    tallas_existentes = {t.talla_eur: t for t in item.tallas}
+    lotes_creados = 0
+    total_unidades = 0
+
+    for entrada in data.items:
+        t_eur = entrada.talla_eur.strip()
+        cant = entrada.cantidad
+        costo_u = Decimal(str(entrada.costo_unitario))
+
+        if t_eur in tallas_existentes:
+            talla_db = tallas_existentes[t_eur]
+            talla_db.cantidad += cant
+        else:
+            t_col = MAPPING_TALLAS.get(t_eur, "38")
+            talla_db = InventarioTalla(
+                inventario_id=item.id,
+                talla_eur=t_eur,
+                talla_col=t_col,
+                cantidad=cant,
+            )
+            db.add(talla_db)
+            db.flush()
+            tallas_existentes[t_eur] = talla_db
+            item.tallas.append(talla_db)
+
+        # Crear nuevo lote FIFO para esta entrada
+        nuevo_lote = InventarioTallaLote(
+            inventario_talla_id=talla_db.id,
+            costo_unitario=costo_u,
+            cantidad_inicial=cant,
+            cantidad_disponible=cant,
+            fecha_ingreso=data.fecha_ingreso,
+            observaciones=data.observaciones or "Entrada de reposición de stock",
+            fecha_registro=datetime.utcnow(),
+        )
+        db.add(nuevo_lote)
+        lotes_creados += 1
+        total_unidades += cant
+
+        # Actualizar último costo de referencia del producto
+        item.costo = float(costo_u)
+
+    # Actualizar estado del producto y campos de compatibilidad
+    actualizar_estado_y_campos_compatibilidad(item)
+    db.commit()
+    db.refresh(item)
+
+    return {
+        "mensaje": f"Se ingresaron {total_unidades} unidades exitosamente en {lotes_creados} lotes.",
+        "inventario_id": item.id,
+        "lotes_creados": lotes_creados,
+        "total_unidades_ingresadas": total_unidades,
+        "tallas_actualizadas": item.tallas,
+    }
+
 
 
 @router.delete("/inventario/{inventario_id}")

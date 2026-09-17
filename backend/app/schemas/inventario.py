@@ -1,6 +1,7 @@
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from datetime import datetime
+
 
 # Mapeo oficial de tallas EUR a COL.
 # Nota sobre nomenclatura: "D" equivale a Dama/Mujer, "H" equivale a Hombre.
@@ -19,6 +20,23 @@ MAPPING_TALLAS = {
     "45": "43",
 }
 
+
+
+from decimal import Decimal
+
+
+class InventarioTallaLoteResponse(BaseModel):
+    id: int
+    inventario_talla_id: int
+    costo_unitario: Decimal
+    cantidad_inicial: int
+    cantidad_disponible: int
+    fecha_ingreso: str
+    observaciones: Optional[str] = None
+    fecha_registro: datetime
+
+    class Config:
+        from_attributes = True
 
 
 class InventarioTallaBase(BaseModel):
@@ -52,9 +70,11 @@ class InventarioTallaResponse(InventarioTallaBase):
     inventario_id: int
     talla_col: str
     fecha_registro: datetime
+    lotes: list[InventarioTallaLoteResponse] = []
 
     class Config:
         from_attributes = True
+
 
 
 class InventarioBase(BaseModel):
@@ -223,3 +243,43 @@ class InventarioResponse(InventarioBase):
     class Config:
         from_attributes = True
 
+
+class EntradaTallaItem(BaseModel):
+    talla_eur: str
+    cantidad: int = Field(..., gt=0, description="Cantidad que ingresa, debe ser mayor a 0")
+    costo_unitario: Decimal = Field(..., ge=0, description="Costo unitario real de compra")
+
+    @field_validator("talla_eur")
+    @classmethod
+    def validar_talla(cls, val: str):
+        v = val.strip()
+        if v not in MAPPING_TALLAS:
+            raise ValueError(f"Talla EUR '{v}' no válida. Permitidas: {', '.join(MAPPING_TALLAS.keys())}")
+        return v
+
+
+class EntradaStockCreate(BaseModel):
+    fecha_ingreso: str = Field(..., description="Fecha de ingreso YYYY-MM-DD")
+    items: list[EntradaTallaItem] = Field(..., min_length=1, description="Lista de tallas y cantidades que ingresan")
+    observaciones: Optional[str] = None
+
+    @field_validator("fecha_ingreso")
+    @classmethod
+    def validar_fecha(cls, val: str):
+        v = val.strip()
+        if not v:
+            raise ValueError("fecha_ingreso es obligatoria")
+        from datetime import datetime as dt
+        try:
+            dt.strptime(v, "%Y-%m-%d")
+        except ValueError:
+            raise ValueError("fecha_ingreso debe tener el formato YYYY-MM-DD")
+        return v
+
+
+class EntradaStockResponse(BaseModel):
+    mensaje: str
+    inventario_id: int
+    lotes_creados: int
+    total_unidades_ingresadas: int
+    tallas_actualizadas: list[InventarioTallaResponse]

@@ -20,3 +20,9 @@ class InventarioTalla(Base):
     fecha_registro = Column(DateTime, default=datetime.utcnow)
 
     inventario = relationship("Inventario", back_populates="tallas")
+    lotes = relationship(
+        "InventarioTallaLote",
+        back_populates="talla",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )

@@ -377,6 +377,12 @@
   transition: all var(--transition-fast);
 }
 
+.btn-reponer:hover {
+  background-color: rgba(16, 185, 129, 0.1);
+  border-color: #10b981;
+  color: #34d399;
+}
+
 .btn-edit:hover {
   background-color: rgba(59, 130, 246, 0.1);
   border-color: #3b82f6;
@@ -1010,5 +1016,65 @@
   .inventario-grid {
     grid-template-columns: 1fr;
     gap: 1rem;
+  }
+}
+
+/* Estilos Modal Reponer Stock / FIFO */
+.modal-subtitulo-reponer {
+  font-size: 0.85rem;
+  color: var(--accent-blue, #3b82f6);
+  margin-top: 0.25rem;
+  font-weight: 500;
+}
+
+.tallas-helper {
+  font-size: 0.8rem;
+  color: var(--text-muted, #94a3b8);
+  margin-top: 0.2rem;
+}
+
+.fila-reponer {
+  display: grid;
+  grid-template-columns: 2fr 1.2fr 1.2fr 2fr auto;
+  gap: 0.75rem;
+  align-items: flex-end;
+}
+
+.reponer-totales-bar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1.5rem;
+  background-color: rgba(17, 24, 39, 0.6);
+  border: 1px solid var(--border-color);
+  padding: 0.85rem 1.25rem;
+  border-radius: var(--radius-sm);
+  margin-top: 1.25rem;
+}
+
+.total-reponer-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.total-reponer-item strong {
+  font-size: 1.05rem;
+  color: #10b981;
+  font-weight: 700;
+}
+
+@media (max-width: 600px) {
+  .fila-reponer {
+    grid-template-columns: 1fr 1fr;
+  }
+  .fila-reponer .btn-eliminar-talla {
+    grid-column: span 2;
+  }
+  .reponer-totales-bar {
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: flex-start;
   }
 }

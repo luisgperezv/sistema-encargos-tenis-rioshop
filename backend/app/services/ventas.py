@@ -11,9 +11,12 @@ from sqlalchemy.exc import IntegrityError
 from app.models.venta_operacion import VentaOperacion
 from app.models.inventario_talla import InventarioTalla
 from app.models.inventario import Inventario
+from app.models.inventario_talla_lote import InventarioTallaLote
+from app.models.venta_lote_consumo import VentaLoteConsumo
 from app.schemas.venta import VentaCheckoutCreate
 
 ZONA_COLOMBIA = timezone(timedelta(hours=-5))
+
 
 
 def crear_venta_desde_encargo_si_no_existe(db: Session, encargo: Encargo) -> Venta | None:
@@ -216,26 +219,79 @@ def procesar_checkout(db: Session, data: VentaCheckoutCreate, origen: str = "inv
                     detail=f"El producto de inventario asociado a la talla {talla_rel.id} no existe."
                 )
 
-            # Descontar stock
+            # 1. Consultar y bloquear los lotes con stock disponible en orden FIFO determinístico (fecha_ingreso ASC, id ASC)
+            lotes_disponibles = db.query(InventarioTallaLote).filter(
+                InventarioTallaLote.inventario_talla_id == talla_rel.id,
+                InventarioTallaLote.cantidad_disponible > 0
+            ).order_by(
+                InventarioTallaLote.fecha_ingreso.asc(),
+                InventarioTallaLote.id.asc()
+            ).with_for_update().all()
+
+            # Fallback defensivo si la talla tiene stock pero no tenía lotes registrados
+            if not lotes_disponibles and talla_rel.cantidad >= item.cantidad:
+                costo_def = Decimal(str(producto.costo or 0.0))
+                fecha_def = producto.fecha_ingreso or datetime.now(ZONA_COLOMBIA).strftime("%Y-%m-%d")
+                lote_def = InventarioTallaLote(
+                    inventario_talla_id=talla_rel.id,
+                    costo_unitario=costo_def,
+                    cantidad_inicial=talla_rel.cantidad,
+                    cantidad_disponible=talla_rel.cantidad,
+                    fecha_ingreso=fecha_def,
+                    observaciones="Lote generado automáticamente por stock existente",
+                    fecha_registro=datetime.utcnow()
+                )
+                db.add(lote_def)
+                db.flush()
+                lotes_disponibles = [lote_def]
+
+            # 2. Descontar stock vía FIFO determinístico
+            cant_por_descontar = item.cantidad
+            consumos_lote = []
+            costo_linea_dec = Decimal("0.0")
+
+            for lote in lotes_disponibles:
+                if cant_por_descontar <= 0:
+                    break
+                consumo = min(lote.cantidad_disponible, cant_por_descontar)
+                lote.cantidad_disponible -= consumo
+                cant_por_descontar -= consumo
+
+                costo_u_dec = Decimal(str(lote.costo_unitario or 0.0))
+                costo_tramo_dec = costo_u_dec * Decimal(str(consumo))
+                costo_linea_dec += costo_tramo_dec
+
+                consumos_lote.append({
+                    "lote_id": lote.id,
+                    "cantidad": consumo,
+                    "costo_unitario": costo_u_dec,
+                    "costo_total": costo_tramo_dec
+                })
+
+            if cant_por_descontar > 0:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Inconsistencia en capas de stock para la talla {talla_rel.talla_eur}. Lotes disponibles insuficientes."
+                )
+
+            # 3. Descontar stock visible de la talla (Invariancia: InventarioTalla.cantidad == sum(lotes.cantidad_disponible))
             talla_rel.cantidad -= item.cantidad
             modified_productos[producto.id] = producto
 
-            # Cálculos financieros usando Decimal
+            # 4. Cálculos financieros usando Decimal
             precio_unitario_dec = Decimal(str(item.precio_unitario))
             cantidad_dec = Decimal(str(item.cantidad))
-            costo_base_dec = Decimal(str(producto.costo or 0.0))
-            
             subtotal_dec = precio_unitario_dec * cantidad_dec
-            costo_linea_dec = costo_base_dec * cantidad_dec
             utilidad_linea_dec = subtotal_dec - costo_linea_dec
-            
-            # Acumular para la cabecera
+            costo_base_promedio_dec = costo_linea_dec / cantidad_dec
+
+            # 5. Acumular para la cabecera
             total_bruto += subtotal_dec
             costo_total_operacion += costo_linea_dec
             utilidad_total_operacion += utilidad_linea_dec
             cantidad_items_operacion += item.cantidad
 
-            # Crear la línea en ventas vinculada con operacion_id
+            # 6. Crear la línea en ventas vinculada con operacion_id
             nueva_venta = Venta(
                 operacion_id=operacion.id,
                 inventario_id=producto.id,
@@ -252,7 +308,7 @@ def procesar_checkout(db: Session, data: VentaCheckoutCreate, origen: str = "inv
                 precio_unitario=float(precio_unitario_dec),
                 subtotal=float(subtotal_dec),
                 precio_venta=float(subtotal_dec),
-                costo_base=float(costo_base_dec),
+                costo_base=float(costo_base_promedio_dec),
                 costo_envio=0.0,
                 costo_despachador=0.0,
                 costo_total=float(costo_linea_dec),
@@ -263,6 +319,20 @@ def procesar_checkout(db: Session, data: VentaCheckoutCreate, origen: str = "inv
                 observaciones=data.observaciones
             )
             db.add(nueva_venta)
+            db.flush()
+
+            # 7. Registrar trazabilidad de consumos en venta_lote_consumos
+            for c in consumos_lote:
+                consumo_db = VentaLoteConsumo(
+                    venta_id=nueva_venta.id,
+                    lote_id=c["lote_id"],
+                    cantidad=c["cantidad"],
+                    costo_unitario=c["costo_unitario"],
+                    costo_total=c["costo_total"],
+                    fecha_registro=datetime.utcnow()
+                )
+                db.add(consumo_db)
+
 
         # Actualizar cabecera con totales calculados
         operacion.total_bruto = total_bruto

@@ -479,7 +479,47 @@ export const eliminarItemInventarioRequest = async (id: number) => {
   return res.json();
 };
 
+export interface EntradaTallaItem {
+  talla_eur: string;
+  cantidad: number;
+  costo_unitario: number;
+}
+
+export interface EntradaStockCreate {
+  fecha_ingreso: string;
+  items: EntradaTallaItem[];
+  observaciones?: string | null;
+}
+
+export interface EntradaStockResponse {
+  mensaje: string;
+  inventario_id: number;
+  lotes_creados: number;
+  total_unidades_ingresadas: number;
+  tallas_actualizadas: any[];
+  detail?: string;
+}
+
+export const registrarEntradaStockRequest = async (
+  inventarioId: number,
+  data: EntradaStockCreate
+): Promise<EntradaStockResponse> => {
+  const token = localStorage.getItem("token");
+
+  const res = await fetch(`${API_URL}/inventario/${inventarioId}/entradas`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+
+  return res.json();
+};
+
 export interface Venta {
+
   id: number;
   encargo_id?: number | null;
   inventario_id?: number | null;
