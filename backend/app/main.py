@@ -410,6 +410,62 @@ def ejecutar_migraciones_ligeras():
         db.rollback()
         logging.warning(f"[MIGRACIÓN WARNING] Error en inicialización de lotes FIFO: {str(lotes_err)}")
 
+    # 11. Verificar/agregar columnas de anulación y estado en venta_operaciones y ventas
+    try:
+        cols_operaciones = {
+            "estado": "VARCHAR(20) DEFAULT 'completada'",
+            "fecha_anulacion": "TIMESTAMP",
+            "motivo_anulacion": "TEXT",
+            "usuario_anulacion": "VARCHAR(100)",
+        }
+        for col, col_type in cols_operaciones.items():
+            try:
+                db.execute(text(f"SELECT {col} FROM venta_operaciones LIMIT 1"))
+            except Exception:
+                db.rollback()
+                try:
+                    db.execute(text(f"ALTER TABLE venta_operaciones ADD COLUMN {col} {col_type}"))
+                    db.commit()
+                except Exception as alter_err:
+                    db.rollback()
+                    logging.warning(f"[MIGRACIÓN WARNING] Error agregando {col} a venta_operaciones: {str(alter_err)}")
+
+        try:
+            db.execute(text("UPDATE venta_operaciones SET estado = 'completada' WHERE estado IS NULL"))
+            db.execute(text("CREATE INDEX IF NOT EXISTS idx_venta_operaciones_estado ON venta_operaciones (estado)"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        cols_ventas = {
+            "estado": "VARCHAR(20) DEFAULT 'completada'",
+            "fecha_anulacion": "TIMESTAMP",
+            "motivo_anulacion": "TEXT",
+        }
+        for col, col_type in cols_ventas.items():
+            try:
+                db.execute(text(f"SELECT {col} FROM ventas LIMIT 1"))
+            except Exception:
+                db.rollback()
+                try:
+                    db.execute(text(f"ALTER TABLE ventas ADD COLUMN {col} {col_type}"))
+                    db.commit()
+                except Exception as alter_err:
+                    db.rollback()
+                    logging.warning(f"[MIGRACIÓN WARNING] Error agregando {col} a ventas: {str(alter_err)}")
+
+        try:
+            db.execute(text("UPDATE ventas SET estado = 'completada' WHERE estado IS NULL"))
+            db.execute(text("CREATE INDEX IF NOT EXISTS idx_ventas_estado ON ventas (estado)"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        print("[MIGRACIÓN] Columnas de estado y anulación verificadas en venta_operaciones y ventas.", flush=True)
+    except Exception as anula_err:
+        db.rollback()
+        logging.warning(f"[MIGRACIÓN WARNING] Error en columnas de anulación: {str(anula_err)}")
+
     db.close()
 
 

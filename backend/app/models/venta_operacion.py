@@ -22,5 +22,9 @@ class VentaOperacion(Base):
     observaciones = Column(String, nullable=True)
     fecha_venta = Column(DateTime, nullable=False, default=datetime.utcnow)
     fecha_registro = Column(DateTime, nullable=False, default=datetime.utcnow)
+    estado = Column(String(20), nullable=False, default="completada", index=True)
+    fecha_anulacion = Column(DateTime, nullable=True)
+    motivo_anulacion = Column(String, nullable=True)
+    usuario_anulacion = Column(String, nullable=True)
 
     detalles = relationship("Venta", back_populates="operacion", cascade="all, delete-orphan")

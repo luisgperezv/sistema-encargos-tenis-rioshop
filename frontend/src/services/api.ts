@@ -549,6 +549,9 @@ export interface Venta {
   origen: string;
   observaciones?: string | null;
   fecha_registro: string;
+  estado?: string;
+  fecha_anulacion?: string | null;
+  motivo_anulacion?: string | null;
 }
 
 export interface ResumenVentas {
@@ -675,6 +678,9 @@ export interface VentaOperacion {
   observaciones?: string | null;
   fecha_venta: string;
   fecha_registro: string;
+  estado?: string;
+  fecha_anulacion?: string | null;
+  motivo_anulacion?: string | null;
   es_legacy?: boolean;
 }
 
@@ -718,6 +724,9 @@ export interface VentaOperacionListItem {
   observaciones?: string | null;
   fecha_venta: string;
   fecha_registro?: string | null;
+  estado?: string;
+  fecha_anulacion?: string | null;
+  motivo_anulacion?: string | null;
   es_legacy: boolean;
 }
 
@@ -741,6 +750,7 @@ export interface HistorialVentasFiltros {
   fecha_desde?: string;
   fecha_hasta?: string;
   metodo_pago?: string;
+  estado?: string;
   buscar?: string;
   limit?: number;
   offset?: number;
@@ -756,6 +766,7 @@ export const listarOperacionesPOSRequest = async (
     if (filtros.fecha_desde) queryParams.append("fecha_desde", filtros.fecha_desde);
     if (filtros.fecha_hasta) queryParams.append("fecha_hasta", filtros.fecha_hasta);
     if (filtros.metodo_pago) queryParams.append("metodo_pago", filtros.metodo_pago);
+    if (filtros.estado) queryParams.append("estado", filtros.estado);
     if (filtros.buscar) queryParams.append("buscar", filtros.buscar);
     if (filtros.limit !== undefined) queryParams.append("limit", filtros.limit.toString());
     if (filtros.offset !== undefined) queryParams.append("offset", filtros.offset.toString());
@@ -784,6 +795,59 @@ export const obtenerOperacionPOSRequest = async (
       Authorization: `Bearer ${token}`,
     },
   });
+
+  return res.json();
+};
+
+export interface VentaAnulacionRequest {
+  motivo: string;
+}
+
+export interface VentaAnulacionLoteRestaurado {
+  lote_id: number;
+  cantidad_restaurada: number;
+  costo_unitario: number;
+  nueva_cantidad_disponible: number;
+}
+
+export interface VentaAnulacionTallaRestaurada {
+  talla_id: number;
+  cantidad_restaurada: number;
+  nueva_cantidad_total: number;
+}
+
+export interface VentaAnulacionResponse {
+  mensaje: string;
+  operacion_id: number;
+  numero_venta: string;
+  estado: string;
+  fecha_anulacion: string;
+  motivo_anulacion: string;
+  usuario_anulacion: string;
+  unidades_restauradas: number;
+  lotes_restaurados: VentaAnulacionLoteRestaurado[];
+  tallas_restauradas: VentaAnulacionTallaRestaurada[];
+}
+
+export const anularOperacionPOSRequest = async (
+  operacionId: number,
+  motivo: string
+): Promise<VentaAnulacionResponse> => {
+  const token = localStorage.getItem("token");
+
+  const res = await fetch(`${API_URL}/ventas/operaciones/${operacionId}/anular`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ motivo }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Error al anular la operación" }));
+    throw new Error(err.detail || "Error al anular la venta POS");
+  }
 
   return res.json();
 };

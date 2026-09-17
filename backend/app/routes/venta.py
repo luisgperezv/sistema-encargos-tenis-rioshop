@@ -18,9 +18,11 @@ from app.schemas.venta import (
     VentaOperacionListItem,
     HistorialVentasKPIs,
     HistorialVentasResponse,
+    VentaAnulacionRequest,
+    VentaAnulacionResponse,
     MAPA_NORMALIZACION_METODOS,
 )
-from app.services.ventas import procesar_checkout
+from app.services.ventas import procesar_checkout, anular_operacion_pos
 
 
 router = APIRouter()
@@ -75,7 +77,10 @@ def aplicar_fallbacks_venta(venta: Venta) -> dict:
         "fecha_venta": venta.fecha_venta,
         "origen": venta.origen,
         "observaciones": venta.observaciones,
-        "fecha_registro": venta.fecha_registro
+        "fecha_registro": venta.fecha_registro,
+        "estado": getattr(venta, "estado", None) or "completada",
+        "fecha_anulacion": venta.fecha_anulacion.isoformat() if getattr(venta, "fecha_anulacion", None) else None,
+        "motivo_anulacion": getattr(venta, "motivo_anulacion", None),
     }
 
 
@@ -170,7 +175,7 @@ def obtener_resumen_ventas(
     db: Session = Depends(get_db),
     current_user: str = Depends(get_current_user),
 ):
-    query = db.query(Venta)
+    query = db.query(Venta).filter(or_(Venta.estado != "anulada", Venta.estado.is_(None)))
 
     if fecha_desde:
         query = query.filter(Venta.fecha_venta >= fecha_desde)
@@ -270,6 +275,7 @@ def listar_operaciones(
     fecha_desde: Optional[str] = Query(default=None),
     fecha_hasta: Optional[str] = Query(default=None),
     metodo_pago: Optional[str] = Query(default=None),
+    estado: Optional[str] = Query(default=None),
     buscar: Optional[str] = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
@@ -279,6 +285,7 @@ def listar_operaciones(
     fecha_desde = fecha_desde if isinstance(fecha_desde, str) else None
     fecha_hasta = fecha_hasta if isinstance(fecha_hasta, str) else None
     metodo_pago = metodo_pago if isinstance(metodo_pago, str) else None
+    estado = estado if isinstance(estado, str) else None
     buscar = buscar if isinstance(buscar, str) else None
     limit = limit if isinstance(limit, int) else 50
     offset = offset if isinstance(offset, int) else 0
@@ -311,6 +318,8 @@ def listar_operaciones(
     if metodo_pago and metodo_pago.strip():
         metodo_clean = metodo_pago.strip()
         q_ops = q_ops.filter(func.lower(VentaOperacion.metodo_pago) == metodo_clean.lower())
+    if estado and estado.strip():
+        q_ops = q_ops.filter(VentaOperacion.estado == estado.strip().lower())
     if buscar and buscar.strip():
         b = buscar.strip()
         q_ops = q_ops.filter(
@@ -334,6 +343,8 @@ def listar_operaciones(
     if metodo_pago and metodo_pago.strip():
         metodo_clean = metodo_pago.strip()
         q_legacy = q_legacy.filter(func.lower(Venta.metodo_pago) == metodo_clean.lower())
+    if estado and estado.strip():
+        q_legacy = q_legacy.filter(Venta.estado == estado.strip().lower())
     if buscar and buscar.strip():
         b = buscar.strip()
         id_search = b.upper().replace("V-DIR-", "")
@@ -374,6 +385,9 @@ def listar_operaciones(
                 observaciones=op.observaciones,
                 fecha_venta=fecha_str,
                 fecha_registro=op.fecha_registro.isoformat() if op.fecha_registro else None,
+                estado=op.estado or "completada",
+                fecha_anulacion=op.fecha_anulacion.isoformat() if op.fecha_anulacion else None,
+                motivo_anulacion=op.motivo_anulacion,
                 es_legacy=False,
             )
         )
@@ -400,6 +414,9 @@ def listar_operaciones(
                 observaciones=v.observaciones,
                 fecha_venta=v.fecha_venta or "",
                 fecha_registro=v.fecha_registro.isoformat() if v.fecha_registro else None,
+                estado=v.estado or "completada",
+                fecha_anulacion=v.fecha_anulacion.isoformat() if v.fecha_anulacion else None,
+                motivo_anulacion=v.motivo_anulacion,
                 es_legacy=True,
             )
         )
@@ -408,12 +425,14 @@ def listar_operaciones(
     merged = items_ops + items_legacy
     merged.sort(key=lambda x: (x.fecha_venta or "", x.id), reverse=True)
 
-    # 6. Calcular KPIs globales sobre todo el conjunto filtrado
+    # 6. Calcular KPIs globales excluyendo ventas anuladas
+    ventas_activas = [item for item in merged if item.estado != "anulada"]
     total_transacciones = len(merged)
-    unidades_vendidas = sum(item.cantidad_items for item in merged)
-    total_cobrado = sum((item.total_bruto for item in merged), Decimal("0.0"))
-    costos_directos = sum((item.costo_total for item in merged), Decimal("0.0"))
-    utilidad_bruta = sum((item.utilidad_total for item in merged), Decimal("0.0"))
+    total_transacciones_activas = len(ventas_activas)
+    unidades_vendidas = sum(item.cantidad_items for item in ventas_activas)
+    total_cobrado = sum((item.total_bruto for item in ventas_activas), Decimal("0.0"))
+    costos_directos = sum((item.costo_total for item in ventas_activas), Decimal("0.0"))
+    utilidad_bruta = sum((item.utilidad_total for item in ventas_activas), Decimal("0.0"))
 
     # 7. Aplicar paginación
     paginated_items = merged[offset : offset + limit]
@@ -424,7 +443,7 @@ def listar_operaciones(
         limit=limit,
         offset=offset,
         kpis=HistorialVentasKPIs(
-            total_transacciones=total_transacciones,
+            total_transacciones=total_transacciones_activas,
             unidades_vendidas=unidades_vendidas,
             total_cobrado=total_cobrado,
             costos_directos=costos_directos,
@@ -470,6 +489,9 @@ def obtener_operacion(
             observaciones=v.observaciones,
             fecha_venta=v.fecha_registro or datetime.utcnow(),
             fecha_registro=v.fecha_registro or datetime.utcnow(),
+            estado=v.estado or "completada",
+            fecha_anulacion=v.fecha_anulacion,
+            motivo_anulacion=v.motivo_anulacion,
             es_legacy=True,
         )
         return {
@@ -496,6 +518,48 @@ def obtener_operacion(
         "utilidad_total": operacion.utilidad_total,
         "cantidad_items": operacion.cantidad_items,
     }
+
+
+@router.post("/ventas/operaciones/{operacion_id}/anular", response_model=VentaAnulacionResponse)
+def anular_operacion(
+    operacion_id: int,
+    payload: VentaAnulacionRequest,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user),
+):
+    try:
+        resultado = anular_operacion_pos(
+            db=db,
+            operacion_id=operacion_id,
+            motivo=payload.motivo,
+            usuario=current_user,
+        )
+        return resultado
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/ventas/{venta_id}/anular")
+def anular_venta_directa_legacy(
+    venta_id: int,
+    payload: VentaAnulacionRequest,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user),
+):
+    venta = db.query(Venta).filter(Venta.id == venta_id).first()
+    if not venta:
+        raise HTTPException(status_code=404, detail="La venta no existe")
+    if venta.operacion_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Esta venta pertenece a una operación POS agrupada. Debe anularse mediante /ventas/operaciones/{operacion_id}/anular.",
+        )
+    raise HTTPException(
+        status_code=400,
+        detail="Las ventas legacy directas no disponen de trazabilidad de lotes FIFO y no pueden ser anuladas automáticamente.",
+    )
 
 
 @router.get("/ventas/{venta_id}", response_model=VentaResponse)

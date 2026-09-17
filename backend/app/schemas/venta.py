@@ -45,6 +45,9 @@ class VentaResponse(BaseModel):
     origen: str
     observaciones: Optional[str] = None
     fecha_registro: datetime
+    estado: str = "completada"
+    fecha_anulacion: Optional[datetime] = None
+    motivo_anulacion: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -135,6 +138,10 @@ class VentaOperacionResponse(BaseModel):
     observaciones: Optional[str] = None
     fecha_venta: datetime
     fecha_registro: datetime
+    estado: str = "completada"
+    fecha_anulacion: Optional[datetime] = None
+    motivo_anulacion: Optional[str] = None
+    usuario_anulacion: Optional[str] = None
     es_legacy: bool = False
 
     class Config:
@@ -155,10 +162,35 @@ class VentaOperacionListItem(BaseModel):
     observaciones: Optional[str] = None
     fecha_venta: str
     fecha_registro: Optional[str] = None
+    estado: str = "completada"
+    fecha_anulacion: Optional[str] = None
+    motivo_anulacion: Optional[str] = None
     es_legacy: bool = False
 
     class Config:
         from_attributes = True
+
+
+class VentaAnulacionRequest(BaseModel):
+    motivo: str = Field(..., min_length=5, max_length=500, description="Motivo obligatorio de la anulación")
+
+    @field_validator("motivo")
+    @classmethod
+    def validar_motivo(cls, val: str):
+        v = val.strip()
+        if len(v) < 5:
+            raise ValueError("El motivo de anulación debe tener al menos 5 caracteres.")
+        return v
+
+
+class VentaAnulacionResponse(BaseModel):
+    mensaje: str
+    operacion_id: int
+    numero_venta: str
+    estado: str
+    fecha_anulacion: str
+    motivo_anulacion: str
+    pares_restaurados: int
 
 
 class HistorialVentasKPIs(BaseModel):

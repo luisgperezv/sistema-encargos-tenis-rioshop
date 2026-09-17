@@ -340,9 +340,10 @@ def procesar_checkout(db: Session, data: VentaCheckoutCreate, origen: str = "inv
         operacion.utilidad_total = utilidad_total_operacion
         operacion.cantidad_items = cantidad_items_operacion
         
-        # Actualizar estado de inventario si no queda stock total
+        # Actualizar stock total y estado de inventario si no queda stock
         for prod_id, prod in modified_productos.items():
             total_stock = sum(t.cantidad for t in prod.tallas)
+            prod.cantidad = total_stock
             if total_stock <= 0:
                 prod.estado = "agotado"
                 
@@ -365,4 +366,173 @@ def procesar_checkout(db: Session, data: VentaCheckoutCreate, origen: str = "inv
         raise HTTPException(
             status_code=500,
             detail=f"Error al procesar el checkout de la venta: {str(e)}"
+        )
+
+
+def anular_operacion_pos(
+    db: Session,
+    operacion_id: int,
+    motivo: str,
+    usuario: str | None = None
+) -> tuple[VentaOperacion, int]:
+    """
+    Anula completamente una operación de venta POS moderna de forma transaccional y segura (ACID):
+    - Valida motivo obligatorio.
+    - Bloquea pesimistamente la operación y valida que esté 'completada'.
+    - Verifica que todas las líneas tengan trazabilidad de lotes (venta_lote_consumos).
+    - Restaura exactamente cada consumo al InventarioTallaLote de donde provino.
+    - Restaura InventarioTalla.cantidad y valida la invarianza matemática.
+    - Reactiva productos de 'agotado' a 'disponible' si recuperan stock.
+    - Conserva intactos todos los snapshots financieros originales como evidencia histórica.
+    - Marca VentaOperacion y Ventas como 'anulada' con fecha y motivo.
+    """
+    motivo_limpio = (motivo or "").strip()
+    if len(motivo_limpio) < 5:
+        raise HTTPException(
+            status_code=400,
+            detail="El motivo de anulación es obligatorio y debe contener al menos 5 caracteres."
+        )
+
+    try:
+        # 1. Bloquear pesimistamente la operación para evitar carreras concurrentes
+        operacion = db.query(VentaOperacion).filter(
+            VentaOperacion.id == operacion_id
+        ).with_for_update().first()
+
+        if not operacion:
+            raise HTTPException(
+                status_code=404,
+                detail=f"La operación de venta con ID {operacion_id} no existe."
+            )
+
+        # 2. Validar estado actual
+        if operacion.estado == "anulada":
+            dt_str = operacion.fecha_anulacion.strftime("%Y-%m-%d %H:%M:%S") if operacion.fecha_anulacion else "fecha no registrada"
+            raise HTTPException(
+                status_code=400,
+                detail=f"La operación {operacion.numero_venta} ya fue anulada previamente ({dt_str})."
+            )
+
+        if operacion.estado != "completada":
+            raise HTTPException(
+                status_code=400,
+                detail=f"La operación {operacion.numero_venta} se encuentra en estado '{operacion.estado}' y no puede ser anulada."
+            )
+
+        if operacion.origen not in ("inventario", "pos"):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Solo se pueden anular operaciones de venta POS/inventario. Origen actual: '{operacion.origen}'."
+            )
+
+        # 3. Bloquear pesimistamente las líneas en ventas
+        lineas = db.query(Venta).filter(
+            Venta.operacion_id == operacion.id
+        ).order_by(Venta.id.asc()).with_for_update().all()
+
+        if not lineas:
+            raise HTTPException(
+                status_code=400,
+                detail=f"La operación {operacion.numero_venta} no tiene líneas de detalle registradas."
+            )
+
+        # 4. Validar trazabilidad estricta: todas las líneas deben tener venta_lote_consumos
+        for linea in lineas:
+            if not linea.lote_consumos or len(linea.lote_consumos) == 0:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"La línea de venta #{linea.id} ({linea.marca} - {linea.referencia}) no cuenta con trazabilidad de lotes (venta_lote_consumos). No es posible realizar la anulación automática."
+                )
+
+        # 5. Bloquear en orden determinístico de IDs para prevenir deadlocks
+        lot_ids = sorted(list({c.lote_id for linea in lineas for c in linea.lote_consumos}))
+        for lid in lot_ids:
+            db.query(InventarioTallaLote).filter(InventarioTallaLote.id == lid).with_for_update().first()
+
+        talla_ids = sorted(list({linea.inventario_talla_id for linea in lineas if linea.inventario_talla_id}))
+        for tid in talla_ids:
+            db.query(InventarioTalla).filter(InventarioTalla.id == tid).with_for_update().first()
+
+        # 6. Restauración exacta a lotes y tallas
+        total_pares_restaurados = 0
+        tallas_modificadas = {}
+        productos_modificados = {}
+        ahora_utc = datetime.utcnow()
+
+        for linea in lineas:
+            for consumo in linea.lote_consumos:
+                lote = db.query(InventarioTallaLote).filter(InventarioTallaLote.id == consumo.lote_id).first()
+                if not lote:
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"El lote de inventario ID {consumo.lote_id} ya no existe en el sistema."
+                    )
+
+                # Restaurar cantidad disponible al lote original
+                lote.cantidad_disponible += consumo.cantidad
+
+                # Protección contra desbordamiento de capacidad
+                if lote.cantidad_disponible > lote.cantidad_inicial:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Inconsistencia en lote {lote.id}: la cantidad disponible ({lote.cantidad_disponible}) superaría la cantidad inicial ({lote.cantidad_inicial})."
+                    )
+                total_pares_restaurados += consumo.cantidad
+
+            # Restaurar cantidad visible de la talla
+            if linea.inventario_talla_id:
+                talla = db.query(InventarioTalla).filter(InventarioTalla.id == linea.inventario_talla_id).first()
+                if talla:
+                    talla.cantidad += (linea.cantidad or 1)
+                    tallas_modificadas[talla.id] = talla
+
+                    if talla.inventario_id and talla.inventario_id not in productos_modificados:
+                        prod = db.query(Inventario).filter(Inventario.id == talla.inventario_id).with_for_update().first()
+                        if prod:
+                            productos_modificados[prod.id] = prod
+
+            # Marcar línea como anulada conservando intactos los valores financieros (Evidencia histórica)
+            linea.estado = "anulada"
+            linea.fecha_anulacion = ahora_utc
+            linea.motivo_anulacion = motivo_limpio
+
+        # Flush para asentar los cambios de stock en la transacción antes de verificar
+        db.flush()
+
+        # 7. Verificar invarianza en cada talla modificada
+        for tid, t in tallas_modificadas.items():
+            db.refresh(t)
+            sum_lotes = sum(l.cantidad_disponible for l in t.lotes)
+            if t.cantidad != sum_lotes:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invarianza violada en talla {t.id} ({t.talla_eur}): cantidad={t.cantidad} != lotes={sum_lotes} tras anulación."
+                )
+
+        # 8. Reactivar producto si estaba agotado y sincronizar stock total
+        for pid, prod in productos_modificados.items():
+            db.refresh(prod)
+            total_stock = sum(t.cantidad for t in prod.tallas)
+            prod.cantidad = total_stock
+            if total_stock > 0 and prod.estado == "agotado":
+                prod.estado = "disponible"
+
+        # 9. Actualizar cabecera de la operación (Conserva snapshots financieros originales)
+        operacion.estado = "anulada"
+        operacion.fecha_anulacion = ahora_utc
+        operacion.motivo_anulacion = motivo_limpio
+        operacion.usuario_anulacion = usuario
+
+        db.flush()
+        db.commit()
+        db.refresh(operacion)
+        return operacion, total_pares_restaurados
+
+    except Exception as e:
+        db.rollback()
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error inesperado al anular la operación de venta: {str(e)}"
         )

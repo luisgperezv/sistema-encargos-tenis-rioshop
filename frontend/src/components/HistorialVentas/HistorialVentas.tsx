@@ -20,6 +20,7 @@ import {
   RotateCcw,
   ReceiptText,
   AlertCircle,
+  Ban,
 } from "lucide-react";
 import "./HistorialVentas.css";
 
@@ -111,6 +112,7 @@ export const HistorialVentas = () => {
   const [fechaDesde, setFechaDesde] = useState<string>(() => obtenerRangoPeriodo("mes").desde);
   const [fechaHasta, setFechaHasta] = useState<string>(() => obtenerRangoPeriodo("mes").hasta);
   const [metodoPago, setMetodoPago] = useState<string>("Todos");
+  const [filtroEstado, setFiltroEstado] = useState<string>("Todos");
   const [buscar, setBuscar] = useState<string>("");
   const [buscarDebounced, setBuscarDebounced] = useState<string>("");
 
@@ -167,6 +169,7 @@ export const HistorialVentas = () => {
         fecha_desde: fechaDesde || undefined,
         fecha_hasta: fechaHasta || undefined,
         metodo_pago: metodoPago === "Todos" ? undefined : metodoPago,
+        estado: filtroEstado === "Todos" ? undefined : filtroEstado.toLowerCase(),
         buscar: buscarDebounced.trim() || undefined,
         limit: limite,
         offset: offset,
@@ -196,7 +199,7 @@ export const HistorialVentas = () => {
 
   useEffect(() => {
     cargarHistorial();
-  }, [fechaDesde, fechaHasta, metodoPago, buscarDebounced, pagina]);
+  }, [fechaDesde, fechaHasta, metodoPago, filtroEstado, buscarDebounced, pagina]);
 
   const totalPaginas = Math.ceil(total / limite) || 1;
 
@@ -206,6 +209,7 @@ export const HistorialVentas = () => {
     setFechaDesde(r.desde);
     setFechaHasta(r.hasta);
     setMetodoPago("Todos");
+    setFiltroEstado("Todos");
     setBuscar("");
     setBuscarDebounced("");
     setPagina(1);
@@ -429,6 +433,22 @@ export const HistorialVentas = () => {
               ))}
             </select>
           </div>
+
+          <div className="hv-select-wrap">
+            <Filter size={16} className="hv-select-icon" />
+            <select
+              value={filtroEstado}
+              onChange={(e) => {
+                setFiltroEstado(e.target.value);
+                setPagina(1);
+              }}
+              className="hv-select"
+            >
+              <option value="Todos">Todos los estados</option>
+              <option value="completada">Completadas</option>
+              <option value="anulada">Anuladas</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -476,115 +496,134 @@ export const HistorialVentas = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((it) => (
-                    <tr key={`${it.es_legacy ? 'leg' : 'pos'}-${it.id}`}>
-                      <td>
-                        <div className="hv-ticket-col">
-                          <span className="hv-ticket-num">{it.numero_venta}</span>
-                          {it.es_legacy && (
-                            <span className="hv-ticket-tag-legacy">Directa</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="hv-fecha-col">
-                        {formatearFechaHora(it.fecha_venta)}
-                      </td>
-                      <td>
-                        <div className="hv-cliente-col">
-                          <span className="hv-cliente-nombre">
-                            {it.cliente_nombre || "Cliente casual"}
+                  {items.map((it) => {
+                    const anulada = it.estado === "anulada";
+                    return (
+                      <tr
+                        key={`${it.es_legacy ? 'leg' : 'pos'}-${it.id}`}
+                        className={anulada ? "hv-row-anulada" : ""}
+                      >
+                        <td>
+                          <div className="hv-ticket-col">
+                            <span className="hv-ticket-num">{it.numero_venta}</span>
+                            {anulada && (
+                              <span className="hv-badge-anulada">
+                                <Ban size={11} /> ANULADA
+                              </span>
+                            )}
+                            {it.es_legacy && (
+                              <span className="hv-ticket-tag-legacy">Directa</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="hv-fecha-col">
+                          {formatearFechaHora(it.fecha_venta)}
+                        </td>
+                        <td>
+                          <div className="hv-cliente-col">
+                            <span className="hv-cliente-nombre">
+                              {it.cliente_nombre || "Cliente casual"}
+                            </span>
+                            {it.cliente_telefono && (
+                              <span className="hv-cliente-tel">{it.cliente_telefono}</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="hv-text-center">
+                          <span className="hv-unidades-badge">
+                            {it.cantidad_items} {it.cantidad_items === 1 ? "par" : "pares"}
                           </span>
-                          {it.cliente_telefono && (
-                            <span className="hv-cliente-tel">{it.cliente_telefono}</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="hv-text-center">
-                        <span className="hv-unidades-badge">
-                          {it.cantidad_items} {it.cantidad_items === 1 ? "par" : "pares"}
-                        </span>
-                      </td>
-                      <td>
-                        <span className="hv-metodo-pill">
-                          {it.metodo_pago || "Efectivo"}
-                        </span>
-                      </td>
-                      <td className="hv-text-right hv-font-semibold hv-text-cobrado">
-                        {formatearPesos(it.total_bruto)}
-                      </td>
-                      <td className="hv-text-right hv-font-semibold hv-text-utilidad">
-                        {formatearPesos(it.utilidad_total)}
-                      </td>
-                      <td className="hv-text-center">
-                        <button
-                          type="button"
-                          className="hv-btn-detalle"
-                          onClick={() => abrirDetalle(it.id, it.es_legacy)}
-                          title="Ver detalle de la venta"
-                        >
-                          <Eye size={15} />
-                          <span>Detalle</span>
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td>
+                          <span className="hv-metodo-pill">
+                            {it.metodo_pago || "Efectivo"}
+                          </span>
+                        </td>
+                        <td className="hv-text-right hv-font-semibold hv-text-cobrado">
+                          {formatearPesos(it.total_bruto)}
+                        </td>
+                        <td className="hv-text-right hv-font-semibold hv-text-utilidad">
+                          {formatearPesos(it.utilidad_total)}
+                        </td>
+                        <td className="hv-text-center">
+                          <button
+                            type="button"
+                            className="hv-btn-detalle"
+                            onClick={() => abrirDetalle(it.id, it.es_legacy)}
+                            title="Ver detalle de la venta"
+                          >
+                            <Eye size={15} />
+                            <span>Detalle</span>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
 
             {/* Cards para Móvil */}
             <div className="hv-mobile-cards-list">
-              {items.map((it) => (
-                <div
-                  key={`m-${it.es_legacy ? 'leg' : 'pos'}-${it.id}`}
-                  className="hv-card-movil"
-                  onClick={() => abrirDetalle(it.id, it.es_legacy)}
-                >
-                  <div className="hv-card-movil-header">
-                    <div className="hv-card-movil-ticket">
-                      <span className="hv-ticket-num">{it.numero_venta}</span>
-                      {it.es_legacy && (
-                        <span className="hv-ticket-tag-legacy">Directa</span>
-                      )}
+              {items.map((it) => {
+                const anulada = it.estado === "anulada";
+                return (
+                  <div
+                    key={`m-${it.es_legacy ? 'leg' : 'pos'}-${it.id}`}
+                    className={`hv-card-movil ${anulada ? "hv-card-anulada" : ""}`}
+                    onClick={() => abrirDetalle(it.id, it.es_legacy)}
+                  >
+                    <div className="hv-card-movil-header">
+                      <div className="hv-card-movil-ticket">
+                        <span className="hv-ticket-num">{it.numero_venta}</span>
+                        {anulada && (
+                          <span className="hv-badge-anulada">
+                            <Ban size={11} /> ANULADA
+                          </span>
+                        )}
+                        {it.es_legacy && (
+                          <span className="hv-ticket-tag-legacy">Directa</span>
+                        )}
+                      </div>
+                      <span className="hv-card-movil-fecha">
+                        {formatearFechaHora(it.fecha_venta)}
+                      </span>
                     </div>
-                    <span className="hv-card-movil-fecha">
-                      {formatearFechaHora(it.fecha_venta)}
-                    </span>
-                  </div>
 
-                  <div className="hv-card-movil-body">
-                    <div className="hv-card-movil-cliente">
-                      <span className="hv-cliente-nombre">
-                        {it.cliente_nombre || "Cliente casual"}
-                      </span>
-                      {it.cliente_telefono && (
-                        <span className="hv-cliente-tel">{it.cliente_telefono}</span>
-                      )}
+                    <div className="hv-card-movil-body">
+                      <div className="hv-card-movil-cliente">
+                        <span className="hv-cliente-nombre">
+                          {it.cliente_nombre || "Cliente casual"}
+                        </span>
+                        {it.cliente_telefono && (
+                          <span className="hv-cliente-tel">{it.cliente_telefono}</span>
+                        )}
+                      </div>
+                      <div className="hv-card-movil-meta">
+                        <span className="hv-metodo-pill">{it.metodo_pago || "Efectivo"}</span>
+                        <span className="hv-unidades-badge">
+                          {it.cantidad_items} {it.cantidad_items === 1 ? "par" : "pares"}
+                        </span>
+                      </div>
                     </div>
-                    <div className="hv-card-movil-meta">
-                      <span className="hv-metodo-pill">{it.metodo_pago || "Efectivo"}</span>
-                      <span className="hv-unidades-badge">
-                        {it.cantidad_items} {it.cantidad_items === 1 ? "par" : "pares"}
-                      </span>
-                    </div>
-                  </div>
 
-                  <div className="hv-card-movil-footer">
-                    <div>
-                      <span className="hv-card-footer-label">Total Cobrado:</span>
-                      <span className="hv-card-footer-val hv-text-cobrado">
-                        {formatearPesos(it.total_bruto)}
-                      </span>
-                    </div>
-                    <div className="hv-text-right">
-                      <span className="hv-card-footer-label">Utilidad Bruta:</span>
-                      <span className="hv-card-footer-val hv-text-utilidad">
-                        {formatearPesos(it.utilidad_total)}
-                      </span>
+                    <div className="hv-card-movil-footer">
+                      <div>
+                        <span className="hv-card-footer-label">Total Cobrado:</span>
+                        <span className="hv-card-footer-val hv-text-cobrado">
+                          {formatearPesos(it.total_bruto)}
+                        </span>
+                      </div>
+                      <div className="hv-text-right">
+                        <span className="hv-card-footer-label">Utilidad Bruta:</span>
+                        <span className="hv-card-footer-val hv-text-utilidad">
+                          {formatearPesos(it.utilidad_total)}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Controles de Paginación */}
@@ -635,6 +674,7 @@ export const HistorialVentas = () => {
           operacionId={modalOperacionId}
           esLegacy={modalEsLegacy}
           onClose={cerrarDetalle}
+          onOperacionAnulada={cargarHistorial}
         />
       )}
     </div>

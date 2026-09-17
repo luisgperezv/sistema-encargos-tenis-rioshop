@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import text
+from sqlalchemy import text, or_
 from typing import Optional
 from datetime import datetime, date, timedelta, timezone
 
@@ -130,9 +130,11 @@ def obtener_resumen_financiero(
     #    A) Operaciones agrupadas (tabla: venta_operaciones)
     #    B) Ventas directas sin operacion_id (tabla: ventas con origen='inventario')
     # ──────────────────────────────────────────────────────────────────────────
-    # 2A. venta_operaciones
+    # 2A. venta_operaciones (excluyendo operaciones anuladas)
     # Convertimos fecha_venta a string YYYY-MM-DD en zona horaria Colombia
-    q_ops = db.query(VentaOperacion)
+    q_ops = db.query(VentaOperacion).filter(
+        or_(VentaOperacion.estado != "anulada", VentaOperacion.estado.is_(None))
+    )
     ops_all = q_ops.all()
 
     ops_filtradas = []
@@ -157,10 +159,11 @@ def obtener_resumen_financiero(
     pos_ops_costos = sum(int(round(float(op.costo_total or 0))) for op in ops_filtradas)
     pos_ops_util = sum(int(round(float(op.utilidad_total or 0))) for op in ops_filtradas)
 
-    # 2B. ventas directas sin operacion_id
+    # 2B. ventas directas sin operacion_id (excluyendo ventas anuladas)
     q_v_dir = db.query(Venta).filter(
         Venta.origen == "inventario",
         Venta.operacion_id == None,
+        or_(Venta.estado != "anulada", Venta.estado.is_(None)),
     )
     if f_desde and f_hasta:
         q_v_dir = q_v_dir.filter(Venta.fecha_venta >= f_desde, Venta.fecha_venta <= f_hasta)

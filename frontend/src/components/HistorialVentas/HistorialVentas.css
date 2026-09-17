@@ -1225,3 +1225,229 @@
     gap: 0.75rem;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────
+   FASE 5 — ESTILOS DE ANULACIÓN DE VENTAS POS
+   ───────────────────────────────────────────────────────────── */
+
+.hv-badge-anulada {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-full);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.hv-row-anulada {
+  background: rgba(239, 68, 68, 0.03) !important;
+  opacity: 0.78;
+}
+
+.hv-row-anulada:hover {
+  opacity: 0.95;
+}
+
+.hv-row-anulada .hv-text-cobrado,
+.hv-row-anulada .hv-text-utilidad {
+  text-decoration: line-through;
+  opacity: 0.75;
+  color: var(--text-muted) !important;
+}
+
+.hv-card-movil.hv-card-anulada {
+  border-left: 3px solid #ef4444;
+  opacity: 0.8;
+}
+
+.hv-card-movil.hv-card-anulada .hv-card-footer-val {
+  text-decoration: line-through;
+  opacity: 0.75;
+  color: var(--text-muted) !important;
+}
+
+/* Banner de Venta Anulada en Modal */
+.hv-anulada-banner {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.25rem;
+  color: #fca5a5;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.hv-anulada-banner-top {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #f87171;
+}
+
+.hv-anulada-banner-detail {
+  font-size: 0.84rem;
+  color: #fca5a5;
+  line-height: 1.45;
+}
+
+.hv-anulada-banner-motivo {
+  font-style: italic;
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 0.4rem 0.75rem;
+  border-radius: var(--radius-sm);
+  margin-top: 0.25rem;
+  border-left: 3px solid #ef4444;
+}
+
+/* Botón Anular Venta */
+.hv-btn-anular {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  padding: 0.55rem 1.1rem;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.hv-btn-anular:hover:not(:disabled) {
+  background: #ef4444;
+  color: #ffffff;
+  border-color: #ef4444;
+}
+
+.hv-btn-anular:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Modal de Confirmación de Anulación */
+.hv-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 1rem;
+}
+
+.hv-confirm-card {
+  background: var(--bg-card);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: var(--radius-lg);
+  max-width: 480px;
+  width: 100%;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+  animation: hvFadeIn 200ms ease-out;
+}
+
+.hv-confirm-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: #f87171;
+}
+
+.hv-confirm-header h3 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin: 0;
+  color: #ffffff;
+}
+
+.hv-confirm-body {
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.hv-confirm-warning {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: var(--radius-sm);
+  padding: 0.65rem 0.85rem;
+  color: #fca5a5;
+  font-size: 0.82rem;
+}
+
+.hv-confirm-textarea {
+  width: 100%;
+  min-height: 80px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  padding: 0.65rem;
+  font-size: 0.88rem;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.hv-confirm-textarea:focus {
+  outline: none;
+  border-color: #ef4444;
+}
+
+.hv-confirm-error {
+  color: #f87171;
+  font-size: 0.82rem;
+  margin-top: -0.25rem;
+}
+
+.hv-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.hv-btn-confirmar-anular {
+  background: #ef4444;
+  color: #ffffff;
+  border: 1px solid #ef4444;
+  padding: 0.55rem 1.1rem;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 0.88rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  transition: background var(--transition-fast);
+}
+
+.hv-btn-confirmar-anular:hover:not(:disabled) {
+  background: #dc2626;
+  border-color: #dc2626;
+}
+
+.hv-btn-confirmar-anular:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

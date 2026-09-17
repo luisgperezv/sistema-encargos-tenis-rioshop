@@ -49,6 +49,9 @@ class Venta(Base):
     origen = Column(String, nullable=False, default="encargo")
     observaciones = Column(String, nullable=True)
     fecha_registro = Column(DateTime, default=datetime.utcnow)
+    estado = Column(String(20), nullable=False, default="completada", index=True)
+    fecha_anulacion = Column(DateTime, nullable=True)
+    motivo_anulacion = Column(String, nullable=True)
 
     # Relación de auditoría (soporta nulos si se elimina el encargo o producto)
     encargo = relationship("Encargo")

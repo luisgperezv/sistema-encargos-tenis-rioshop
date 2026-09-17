@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
-import { obtenerOperacionPOSRequest } from "../../services/api";
+import { obtenerOperacionPOSRequest, anularOperacionPOSRequest } from "../../services/api";
 import type { VentaCheckoutResponse } from "../../services/api";
-
 
 import {
   X,
@@ -14,6 +13,8 @@ import {
   DollarSign,
   TrendingUp,
   AlertCircle,
+  AlertTriangle,
+  Ban,
   ExternalLink,
   ShieldCheck,
 } from "lucide-react";
@@ -22,6 +23,7 @@ interface DetalleVentaModalProps {
   operacionId: number | null;
   esLegacy: boolean;
   onClose: () => void;
+  onOperacionAnulada?: () => void;
 }
 
 const formatearPesos = (valor: number | undefined | null) => {
@@ -61,11 +63,18 @@ export const DetalleVentaModal = ({
   operacionId,
   esLegacy,
   onClose,
+  onOperacionAnulada,
 }: DetalleVentaModalProps) => {
 
   const [data, setData] = useState<VentaCheckoutResponse | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Estados de anulación
+  const [confirmandoAnulacion, setConfirmandoAnulacion] = useState(false);
+  const [motivoAnulacion, setMotivoAnulacion] = useState("");
+  const [anulando, setAnulando] = useState(false);
+  const [errorAnulacion, setErrorAnulacion] = useState<string | null>(null);
 
   useEffect(() => {
     if (!operacionId) return;
@@ -99,13 +108,55 @@ export const DetalleVentaModal = ({
   // Cierre con tecla Escape
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        if (confirmandoAnulacion) {
+          if (!anulando) setConfirmandoAnulacion(false);
+        } else {
+          onClose();
+        }
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  }, [onClose, confirmandoAnulacion, anulando]);
 
   if (!operacionId) return null;
+
+  const handleEjecutarAnulacion = async () => {
+    const motivoLimpio = motivoAnulacion.trim();
+    if (motivoLimpio.length < 5) {
+      setErrorAnulacion("El motivo debe tener al menos 5 caracteres.");
+      return;
+    }
+
+    setAnulando(true);
+    setErrorAnulacion(null);
+    try {
+      const res = await anularOperacionPOSRequest(operacionId, motivoLimpio);
+      setConfirmandoAnulacion(false);
+      // Actualizar estado local de la transacción
+      setData((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          operacion: {
+            ...prev.operacion,
+            estado: "anulada",
+            fecha_anulacion: res.fecha_anulacion,
+            motivo_anulacion: res.motivo_anulacion,
+          },
+        };
+      });
+      // Notificar al componente padre para que actualice la lista y KPIs sin recargar
+      if (onOperacionAnulada) {
+        onOperacionAnulada();
+      }
+    } catch (err: any) {
+      setErrorAnulacion(err.message || "Error al anular la operación.");
+    } finally {
+      setAnulando(false);
+    }
+  };
 
   const getWhatsAppLink = (tel?: string | null) => {
     if (!tel) return null;
@@ -114,6 +165,8 @@ export const DetalleVentaModal = ({
     const num = digits.length === 10 && digits.startsWith("3") ? `57${digits}` : digits;
     return `https://wa.me/${num}`;
   };
+
+  const esAnulada = data?.operacion.estado === "anulada";
 
   return (
     <div className="hv-modal-overlay" onClick={onClose}>
@@ -125,6 +178,11 @@ export const DetalleVentaModal = ({
               <span className="hv-badge-ticket">
                 {data?.operacion.numero_venta || `V-${operacionId}`}
               </span>
+              {esAnulada && (
+                <span className="hv-badge-anulada">
+                  <Ban size={12} /> ANULADA
+                </span>
+              )}
               {esLegacy ? (
                 <span className="hv-badge-legacy">Venta Histórica (Directa)</span>
               ) : (
@@ -155,6 +213,29 @@ export const DetalleVentaModal = ({
             </div>
           ) : data ? (
             <>
+              {/* Banner informativo si la venta está anulada */}
+              {esAnulada && (
+                <div className="hv-anulada-banner">
+                  <div className="hv-anulada-banner-top">
+                    <AlertTriangle size={18} />
+                    <span>TRANSACCIÓN ANULADA</span>
+                  </div>
+                  <div className="hv-anulada-banner-detail">
+                    <div>
+                      <strong>Fecha de anulación:</strong>{" "}
+                      {formatearFechaHora(data.operacion.fecha_anulacion)}
+                    </div>
+                    {data.operacion.motivo_anulacion && (
+                      <div className="hv-anulada-banner-motivo">
+                        <strong>Motivo:</strong> "{data.operacion.motivo_anulacion}"
+                      </div>
+                    )}
+                    <div style={{ marginTop: "0.4rem", fontSize: "0.82rem", opacity: 0.9 }}>
+                      El stock consumido fue reintegrado de forma exacta a los lotes originales. Los valores financieros se preservan intactos como comprobante histórico de auditoría.
+                    </div>
+                  </div>
+                </div>
+              )}
               {/* Información General de la Operación */}
               <div className="hv-info-grid">
                 <div className="hv-info-box">
@@ -377,7 +458,13 @@ export const DetalleVentaModal = ({
 
               <div className="hv-audit-notice">
                 <ShieldCheck size={16} />
-                <span>Registro de solo lectura · Consulta oficial de caja</span>
+                <span>
+                  {esAnulada
+                    ? "Transacción anulada · Registro histórico inmutable de auditoría"
+                    : esLegacy
+                    ? "Venta legacy directa · Modo consulta estricto"
+                    : "Punto de venta POS · Consulta y auditoría de caja"}
+                </span>
               </div>
             </>
           ) : null}
@@ -385,11 +472,93 @@ export const DetalleVentaModal = ({
 
         {/* Footer del Modal */}
         <div className="hv-modal-footer">
+          {!esLegacy && !esAnulada && data && (
+            <button
+              type="button"
+              className="hv-btn-anular"
+              onClick={() => {
+                setConfirmandoAnulacion(true);
+                setErrorAnulacion(null);
+                setMotivoAnulacion("");
+              }}
+              title="Anular venta y restaurar inventario"
+            >
+              <Ban size={16} />
+              <span>Anular Venta</span>
+            </button>
+          )}
           <button className="hv-btn-cerrar" onClick={onClose}>
             Cerrar
           </button>
         </div>
       </div>
+
+      {/* Modal de confirmación para obligar motivo */}
+      {confirmandoAnulacion && data && (
+        <div
+          className="hv-confirm-overlay"
+          onClick={() => !anulando && setConfirmandoAnulacion(false)}
+        >
+          <div className="hv-confirm-card" onClick={(e) => e.stopPropagation()}>
+            <div className="hv-confirm-header">
+              <AlertTriangle size={24} />
+              <h3>Confirmar Anulación de Venta</h3>
+            </div>
+            <div className="hv-confirm-body">
+              <p>
+                ¿Deseas anular la transacción{" "}
+                <strong>{data.operacion.numero_venta}</strong>?
+              </p>
+              <div className="hv-confirm-warning">
+                ⚠️ <strong>Operación irreversible:</strong> Se reintegrarán las{" "}
+                {data.cantidad_items || 1} unidades a los lotes exactos de inventario
+                y la venta quedará registrada como ANULADA para trazabilidad y auditoría.
+              </div>
+              <label
+                style={{
+                  fontWeight: 600,
+                  fontSize: "0.85rem",
+                  color: "var(--text-primary)",
+                }}
+              >
+                Motivo obligatorio de la anulación (mínimo 5 caracteres):
+              </label>
+              <textarea
+                className="hv-confirm-textarea"
+                placeholder="Ej: Cliente canceló antes de despacho / Error al registrar talla en caja..."
+                value={motivoAnulacion}
+                onChange={(e) => {
+                  setMotivoAnulacion(e.target.value);
+                  if (errorAnulacion) setErrorAnulacion(null);
+                }}
+                disabled={anulando}
+                autoFocus
+              />
+              {errorAnulacion && (
+                <div className="hv-confirm-error">{errorAnulacion}</div>
+              )}
+            </div>
+            <div className="hv-confirm-actions">
+              <button
+                type="button"
+                className="hv-btn-secundario"
+                disabled={anulando}
+                onClick={() => setConfirmandoAnulacion(false)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="hv-btn-confirmar-anular"
+                disabled={anulando || motivoAnulacion.trim().length < 5}
+                onClick={handleEjecutarAnulacion}
+              >
+                {anulando ? "Anulando..." : "Confirmar Anulación"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
