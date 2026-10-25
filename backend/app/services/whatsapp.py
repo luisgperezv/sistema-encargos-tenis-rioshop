@@ -1,5 +1,50 @@
 import requests
 from app.core.config import settings
+from app.services.whatsapp_media import preparar_imagen_whatsapp, ErrorImagenWhatsapp
+
+
+def enmascarar_telefono(numero: str | None) -> str:
+    """Evita registrar números completos en logs: 57300***4567."""
+    s = "".join(ch for ch in str(numero or "") if ch.isdigit())
+    if len(s) <= 4:
+        return "***"
+    return f"{s[:5]}***{s[-4:]}"
+
+
+def _preparar_media(image_url: str):
+    """Retorna (media_dict, None) o (None, respuesta_error)."""
+    try:
+        return preparar_imagen_whatsapp(image_url), None
+    except ErrorImagenWhatsapp as e:
+        return None, {"error": {"code": "LOCAL_MEDIA", "message": f"Imagen no apta para WhatsApp: {e}"}}
+
+
+def _post_whatsapp(payload: dict, contexto: str, media: dict | None = None) -> dict:
+    """
+    Envía a Graph API y normaliza la respuesta. HTTP 200 solo significa 'accepted'.
+    No registra tokens ni números completos.
+    """
+    try:
+        response = requests.post(
+            obtener_url_whatsapp(), headers=obtener_headers_whatsapp(), json=payload, timeout=30
+        )
+        try:
+            res_json = response.json()
+        except ValueError:
+            res_json = {}
+        if response.status_code != 200 or "error" in res_json:
+            err = res_json.get("error") if isinstance(res_json.get("error"), dict) else {}
+            codigo = err.get("code", response.status_code)
+            mensaje = err.get("message") or f"Meta HTTP {response.status_code}"
+            print(f"[WA_SEND] {contexto} rechazado por Meta. code={codigo} msg={mensaje}", flush=True)
+            return {"error": {"code": str(codigo), "message": mensaje}}
+        if media:
+            res_json["_media"] = media
+        wamid = (res_json.get("messages") or [{}])[0].get("id")
+        print(f"[WA_SEND] {contexto} accepted. wamid={wamid}", flush=True)
+        return res_json
+    except Exception as e:
+        return {"error": {"code": "LOCAL_NETWORK", "message": f"Error de conexión con WhatsApp: {type(e).__name__}"}}
 
 
 def obtener_url_whatsapp() -> str:
@@ -111,15 +156,7 @@ def enviar_template_confirmacion_encargo(
         }
     }
 
-    try:
-        response = requests.post(url, headers=headers, json=payload, timeout=30)
-        res_json = response.json()
-        if response.status_code != 200 or "error" in res_json:
-            print("Error Meta WhatsApp Cliente:", res_json)
-            return res_json if "error" in res_json else {"error": {"message": f"Meta HTTP {response.status_code}: {response.text}"}}
-        return res_json
-    except Exception as e:
-        return {"error": {"message": f"Error enviando mensaje WhatsApp al cliente: {str(e)}"}}
+    return _post_whatsapp(payload, "cliente_confirmacion_texto")
 
 
 def enviar_template_confirmacion_encargo_foto(
@@ -157,6 +194,9 @@ def enviar_template_confirmacion_encargo_foto(
     url = obtener_url_whatsapp()
     headers = obtener_headers_whatsapp()
     numero_formateado = normalizar_numero_whatsapp(numero)
+    media, error = _preparar_media(image_url)
+    if error:
+        return error
 
     payload = {
         "messaging_product": "whatsapp",
@@ -174,7 +214,7 @@ def enviar_template_confirmacion_encargo_foto(
                         {
                             "type": "image",
                             "image": {
-                                "link": str(image_url).strip()
+                                "link": media["url"]
                             }
                         }
                     ]
@@ -196,15 +236,7 @@ def enviar_template_confirmacion_encargo_foto(
         }
     }
 
-    try:
-        response = requests.post(url, headers=headers, json=payload, timeout=30)
-        res_json = response.json()
-        if response.status_code != 200 or "error" in res_json:
-            print("Error Meta WhatsApp Cliente Foto:", res_json)
-            return res_json if "error" in res_json else {"error": {"message": f"Meta HTTP {response.status_code}: {response.text}"}}
-        return res_json
-    except Exception as e:
-        return {"error": {"message": f"Error enviando mensaje WhatsApp al cliente: {str(e)}"}}
+    return _post_whatsapp(payload, "cliente_confirmacion_foto", media)
 
 
 def enviar_template_proveedor_encargo(
@@ -237,8 +269,7 @@ def enviar_template_proveedor_encargo(
         }
     }
 
-    response = requests.post(url, headers=headers, json=payload, timeout=30)
-    return response.json()
+    return _post_whatsapp(payload, "proveedor_texto")
 
 
 def enviar_template_proveedor_foto(
@@ -247,9 +278,10 @@ def enviar_template_proveedor_foto(
     referencia: str,
     talla_eur: str
 ):
-    url = obtener_url_whatsapp()
-    headers = obtener_headers_whatsapp()
     numero_formateado = normalizar_numero_whatsapp(numero)
+    media, error = _preparar_media(image_url)
+    if error:
+        return error
 
     payload = {
         "messaging_product": "whatsapp",
@@ -267,7 +299,7 @@ def enviar_template_proveedor_foto(
                         {
                             "type": "image",
                             "image": {
-                                "link": image_url
+                                "link": media["url"]
                             }
                         }
                     ]
@@ -283,8 +315,7 @@ def enviar_template_proveedor_foto(
         }
     }
 
-    response = requests.post(url, headers=headers, json=payload, timeout=30)
-    return response.json()
+    return _post_whatsapp(payload, "proveedor_foto", media)
 
 def enviar_template_encargo_en_local(
     numero: str,
@@ -293,9 +324,10 @@ def enviar_template_encargo_en_local(
     referencia: str,
     saldo: str
 ):
-    url = obtener_url_whatsapp()
-    headers = obtener_headers_whatsapp()
     numero_formateado = normalizar_numero_whatsapp(numero)
+    media, error = _preparar_media(image_url)
+    if error:
+        return error
 
     payload = {
         "messaging_product": "whatsapp",
@@ -313,7 +345,7 @@ def enviar_template_encargo_en_local(
                         {
                             "type": "image",
                             "image": {
-                                "link": image_url
+                                "link": media["url"]
                             }
                         }
                     ]
@@ -330,11 +362,7 @@ def enviar_template_encargo_en_local(
         }
     }
 
-    response = requests.post(url, headers=headers, json=payload, timeout=30)
-
-    print("WHATSAPP EN LOCAL:", response.json())
-
-    return response.json()
+    return _post_whatsapp(payload, "cliente_en_local_foto", media)
 
 def enviar_mensaje_texto(numero: str, texto: str):
     url = obtener_url_whatsapp()
@@ -365,7 +393,7 @@ def descargar_y_subir_media_whatsapp(media_id: str) -> str | None:
         import io
         import cloudinary
         import cloudinary.uploader
-        
+
         # 1. Configurar Cloudinary usando los settings existentes
         cloudinary.config(
             cloud_name=settings.CLOUDINARY_CLOUD_NAME,
@@ -377,12 +405,12 @@ def descargar_y_subir_media_whatsapp(media_id: str) -> str | None:
         # 2. Consultar Graph API para obtener la URL temporal
         url_info = f"https://graph.facebook.com/{settings.WHATSAPP_API_VERSION}/{media_id}"
         headers = {"Authorization": f"Bearer {settings.WHATSAPP_TOKEN}"}
-        
+
         res_info = requests.get(url_info, headers=headers, timeout=15)
         if res_info.status_code != 200:
             print(f"[MEDIA] Error al obtener info de media {media_id}: {res_info.text}")
             return None
-            
+
         media_data = res_info.json()
         download_url = media_data.get("url")
         if not download_url:
@@ -404,11 +432,11 @@ def descargar_y_subir_media_whatsapp(media_id: str) -> str | None:
             public_id=f"media_{media_id}",
             overwrite=True,
         )
-        
+
         secure_url = resultado.get("secure_url")
         print(f"[MEDIA] Imagen de WhatsApp {media_id} subida con éxito a Cloudinary: {secure_url}")
         return secure_url
     except Exception as e:
         print(f"[MEDIA] Error procesando descarga/subida de WhatsApp media {media_id}: {str(e)}")
         return None
-
+

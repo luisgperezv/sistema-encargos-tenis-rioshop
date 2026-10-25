@@ -13,6 +13,52 @@ import {
 
 import "./ListarEncargos.css";
 
+type InfoWhatsapp = {
+  estado: string;
+  tipo?: string | null;
+  intento?: number | null;
+  total_intentos?: number | null;
+  error_codigo?: string | null;
+  error_mensaje?: string | null;
+} | null | undefined;
+
+// "accepted" solo significa que Meta aceptó la solicitud; NO es entrega.
+const ESTADOS_WA: Record<string, { texto: string; color: string }> = {
+  pendiente: { texto: "Pendiente", color: "#94a3b8" },
+  accepted: { texto: "Aceptado", color: "#60a5fa" },
+  sent: { texto: "Enviado", color: "#a78bfa" },
+  delivered: { texto: "Entregado", color: "#34d399" },
+  read: { texto: "Leído", color: "#10b981" },
+  failed: { texto: "Fallido", color: "#f87171" },
+  incierto: { texto: "Incierto", color: "#fbbf24" },
+};
+
+function BadgeWhatsapp({ etiqueta, info }: { etiqueta: string; info: InfoWhatsapp }) {
+  const conf = info ? ESTADOS_WA[info.estado] || { texto: info.estado, color: "#94a3b8" } : { texto: "Sin registro", color: "#64748b" };
+  const titulo = info
+    ? `${etiqueta}: ${conf.texto}${info.tipo ? ` (${info.tipo})` : ""}` +
+      `${info.total_intentos ? ` · intentos: ${info.total_intentos}` : ""}` +
+      `${info.estado === "failed" ? ` · Error ${info.error_codigo || ""}: ${info.error_mensaje || ""}` : ""}`
+    : `${etiqueta}: sin notificaciones registradas (encargo anterior al seguimiento)`;
+  return (
+    <span
+      title={titulo}
+      style={{
+        fontSize: "0.7rem",
+        padding: "2px 8px",
+        borderRadius: "999px",
+        border: `1px solid ${conf.color}`,
+        color: conf.color,
+        background: `${conf.color}1a`,
+        whiteSpace: "nowrap",
+      }}
+    >
+      💬 {etiqueta}: {conf.texto}
+      {info?.estado === "failed" && info.error_codigo ? ` (${info.error_codigo})` : ""}
+    </span>
+  );
+}
+
 // Mapeo oficial de tallas EUR a COL.
 // Nota sobre nomenclatura: "D" equivale a Dama/Mujer, "H" equivale a Hombre.
 const MAPPING_TALLAS: Record<string, string> = {
@@ -451,7 +497,7 @@ function ListarEncargos() {
     );
 
     if (respuesta.mensaje) {
-      alert("Mensaje reenviado exitosamente");
+      alert(`✅ ${respuesta.mensaje}`);
       setMensaje(`✅ ${respuesta.mensaje}`);
     } else if (respuesta.detail) {
       setMensaje(`❌ ${respuesta.detail}`);
@@ -461,6 +507,7 @@ function ListarEncargos() {
 
     setEncargoReenviando(null);
     setProveedorSeleccionadoReenvio("");
+    await cargarEncargos();
   };
 
   const reenviarAlCliente = async (encargo: any) => {
@@ -492,6 +539,7 @@ function ListarEncargos() {
       alert("❌ Error de conexión al intentar reenviar la notificación al cliente.");
       setMensaje("❌ Error de conexión al intentar reenviar al cliente.");
     }
+    await cargarEncargos();
   };
 
   const abrirEdicion = (encargo: any) => {
@@ -845,6 +893,12 @@ function ListarEncargos() {
                 <p title={encargo.proveedor?.nombre}>
                   <strong>📦 Prov:</strong> {encargo.proveedor?.nombre || "Sin proveedor"}
                 </p>
+              </div>
+
+              {/* 4b. ESTADO DE NOTIFICACIONES WHATSAPP (cliente y proveedor por separado) */}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", margin: "4px 0 8px" }}>
+                <BadgeWhatsapp etiqueta="Cliente" info={encargo.whatsapp_cliente} />
+                <BadgeWhatsapp etiqueta="Proveedor" info={encargo.whatsapp_proveedor} />
               </div>
 
               {/* 5. PRECIO, ABONO Y SALDO */}

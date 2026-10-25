@@ -291,6 +291,23 @@ function Inventario() {
     }
   }, [marcaInput, referenciaInput, articulos, articuloEditando]);
 
+  // Cierre seguro del modal Reponer con tecla Escape
+  useEffect(() => {
+    if (!showReponerModal) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        // Bloquear cierre si hay una operación de registro de stock en curso
+        if (cargando) return;
+        e.stopPropagation();
+        setShowReponerModal(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showReponerModal, cargando]);
+
   const cargarInventario = async () => {
     setCargando(true);
     try {
@@ -1115,7 +1132,15 @@ function Inventario() {
                   {articuloReponiendo.marca} — {articuloReponiendo.referencia} (#Inv-{articuloReponiendo.id})
                 </p>
               </div>
-              <button className="modal-close-btn" onClick={() => setShowReponerModal(false)}>
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={() => {
+                  if (!cargando) setShowReponerModal(false);
+                }}
+                disabled={cargando}
+                title="Cerrar modal"
+              >
                 &times;
               </button>
             </div>
@@ -1253,7 +1278,10 @@ function Inventario() {
                 <button
                   type="button"
                   className="btn-secundario"
-                  onClick={() => setShowReponerModal(false)}
+                  onClick={() => {
+                    if (!cargando) setShowReponerModal(false);
+                  }}
+                  disabled={cargando}
                 >
                   Cancelar
                 </button>

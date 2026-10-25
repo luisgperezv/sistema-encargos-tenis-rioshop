@@ -1,5 +1,16 @@
 from pydantic import BaseModel, field_validator, model_validator
 from typing import Optional
+from datetime import datetime
+
+
+class EstadoNotificacionWhatsapp(BaseModel):
+    estado: str
+    tipo: str | None = None
+    intento: int | None = None
+    total_intentos: int | None = None
+    error_codigo: str | None = None
+    error_mensaje: str | None = None
+    fecha_actualizacion: datetime | None = None
 
 
 TALLAS_VALIDAS = {
@@ -294,6 +305,8 @@ class EncargoResponse(BaseModel):
     fecha_cancelacion: Optional[str] = None
     metodo_pago: Optional[str] = None
     mensaje_advertencia: Optional[str] = None
+    whatsapp_cliente: EstadoNotificacionWhatsapp | None = None
+    whatsapp_proveedor: EstadoNotificacionWhatsapp | None = None
     cliente: ClienteMiniResponse
     proveedor: ProveedorMiniResponse | None = None
 

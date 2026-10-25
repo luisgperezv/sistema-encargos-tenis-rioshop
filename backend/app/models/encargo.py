@@ -42,3 +42,39 @@ class Encargo(Base):
 
     cliente = relationship("Cliente", back_populates="encargos")
     proveedor = relationship("Proveedor", back_populates="encargos")
+
+    # Historial de notificaciones WhatsApp (solo lectura desde aquí).
+    notificaciones_whatsapp = relationship(
+        "NotificacionWhatsapp",
+        primaryjoin="Encargo.id == foreign(NotificacionWhatsapp.encargo_id)",
+        order_by="NotificacionWhatsapp.id",
+        viewonly=True,
+        lazy="selectin",
+    )
+
+    def _ultima_notificacion(self, destinatario: str):
+        notifs = [n for n in (self.notificaciones_whatsapp or []) if n.destinatario == destinatario]
+        if not notifs:
+            return None
+        n = notifs[-1]
+        return {
+            "estado": n.estado,
+            "tipo": n.tipo,
+            "intento": n.intento,
+            "total_intentos": len(notifs),
+            "error_codigo": n.error_codigo,
+            "error_mensaje": n.error_mensaje,
+            "fecha_actualizacion": n.fecha_actualizacion,
+        }
+
+    @property
+    def whatsapp_cliente(self):
+        return self._ultima_notificacion("cliente")
+
+    @property
+    def whatsapp_proveedor(self):
+        return self._ultima_notificacion("proveedor")
+
+
+# Registrar el modelo para que SQLAlchemy resuelva la relación por nombre.
+from app.models import notificacion_whatsapp as _notificacion_whatsapp  # noqa: E402,F401

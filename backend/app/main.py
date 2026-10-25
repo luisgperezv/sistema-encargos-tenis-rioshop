@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Query
+from fastapi import FastAPI, Request, Query, BackgroundTasks
 from app.database import engine, Base
 
 from app.models import cliente
@@ -12,6 +12,8 @@ from app.models import venta_operacion
 from app.models import gasto
 from app.models import inventario_talla_lote
 from app.models import venta_lote_consumo
+from app.models import notificacion_whatsapp
+from app.services.whatsapp import enmascarar_telefono, normalizar_numero_whatsapp
 
 from app.routes import cliente as cliente_router
 
@@ -39,10 +41,10 @@ def ejecutar_migraciones_ligeras():
     from sqlalchemy import text
     from app.database import SessionLocal
     import logging
-    
+
     print("[MIGRACIÓN] Iniciando verificación de base de datos...", flush=True)
     db = SessionLocal()
-    
+
     # 1. Verificar/agregar columnas en mensajes_proveedores
     columnas_mensajes = {
         "media_url": "VARCHAR",
@@ -50,7 +52,7 @@ def ejecutar_migraciones_ligeras():
         "reply_to_text": "TEXT",
         "reply_to_media_url": "VARCHAR"
     }
-    
+
     for col, col_type in columnas_mensajes.items():
         try:
             db.execute(text(f"SELECT {col} FROM mensajes_proveedores LIMIT 1"))
@@ -68,7 +70,7 @@ def ejecutar_migraciones_ligeras():
                     f"[MIGRACIÓN WARNING] No se pudo agregar la columna {col} automáticamente: {str(alter_err)}. "
                     "Es posible que deba agregarse manualmente."
                 )
-                
+
     # 2. Verificar/agregar columnas en encargos
     columnas_encargos = {
         "costo_base": "DOUBLE PRECISION",
@@ -82,7 +84,7 @@ def ejecutar_migraciones_ligeras():
         "fecha_cancelacion": "VARCHAR",
         "metodo_pago": "VARCHAR"
     }
-    
+
     for col, col_type in columnas_encargos.items():
         try:
             db.execute(text(f"SELECT {col} FROM encargos LIMIT 1"))
@@ -203,7 +205,7 @@ def ejecutar_migraciones_ligeras():
             logging.warning(
                 f"[MIGRACIÓN WARNING] No se pudo crear la tabla inventario automáticamente: {str(create_err)}."
             )
-            
+
     # 5. Verificar/crear tabla inventario_tallas y realizar backfill
     try:
         db.execute(text("SELECT id FROM inventario_tallas LIMIT 1"))
@@ -224,7 +226,7 @@ def ejecutar_migraciones_ligeras():
         "marca_normalizada": "VARCHAR",
         "referencia_normalizada": "VARCHAR"
     }
-    
+
     for col, col_type in columnas_inventario.items():
         try:
             db.execute(text(f"SELECT {col} FROM inventario LIMIT 1"))
@@ -246,7 +248,7 @@ def ejecutar_migraciones_ligeras():
     try:
         from app.models.inventario import Inventario
         from app.models.inventario_talla import InventarioTalla
-        
+
         productos = db.query(Inventario).all()
         migrados = 0
         for p in productos:
@@ -256,7 +258,7 @@ def ejecutar_migraciones_ligeras():
                 t_eur = p.talla_eur or "38"
                 t_col = p.talla_col or "36"
                 cant = p.cantidad if p.cantidad is not None else 0
-                
+
                 nueva_talla = InventarioTalla(
                     inventario_id=p.id,
                     talla_eur=t_eur,
@@ -286,7 +288,7 @@ def ejecutar_migraciones_ligeras():
                 Inventario.referencia_normalizada == None
             )
         ).all()
-        
+
         if productos_sin_norm:
             for p in productos_sin_norm:
                 if p.marca_normalizada is None:
@@ -466,6 +468,16 @@ def ejecutar_migraciones_ligeras():
         db.rollback()
         logging.warning(f"[MIGRACIÓN WARNING] Error en columnas de anulación: {str(anula_err)}")
 
+    # 12. Verificar tabla notificaciones_whatsapp (aditiva y segura)
+    try:
+        from app.models.notificacion_whatsapp import NotificacionWhatsapp, EstadoWebhookPendiente
+        NotificacionWhatsapp.__table__.create(bind=db.get_bind(), checkfirst=True)
+        EstadoWebhookPendiente.__table__.create(bind=db.get_bind(), checkfirst=True)
+        print("[MIGRACIÓN] Tabla notificaciones_whatsapp verificada/creada exitosamente.", flush=True)
+    except Exception as notif_err:
+        db.rollback()
+        logging.warning(f"[MIGRACIÓN WARNING] Error verificando notificaciones_whatsapp: {str(notif_err)}")
+
     db.close()
 
 
@@ -522,121 +534,194 @@ def verificar_webhook(
     return {"error": "Token incorrecto"}
 
 
-@app.post("/webhook")
-async def recibir_webhook(request: Request):
-    data = await request.json()
-    print("WEBHOOK_STATUS:", data)
-    
+def resumir_webhook(data: dict) -> dict:
+    """Resumen sin datos personales para logs."""
+    resumen = {"statuses": [], "messages": 0}
     try:
-        if "entry" in data and len(data["entry"]) > 0:
-            for entry in data["entry"]:
-                if "changes" in entry and len(entry["changes"]) > 0:
-                    for change in entry["changes"]:
-                        value = change.get("value", {})
-                        
-                        # Solo procesamos si hay mensajes entrantes, ignorando 'statuses' para evitar loops
-                        if "messages" in value and len(value["messages"]) > 0:
-                            from app.database import SessionLocal
-                            from app.models.proveedor import Proveedor
-                            from app.models.mensaje_proveedor import MensajeProveedor
-                            from datetime import datetime
-                            
-                            db = SessionLocal()
-                            try:
-                                for message in value["messages"]:
-                                    emisor = message.get("from")
-                                    
-                                    if emisor:
-                                        from app.services.whatsapp import normalizar_numero_whatsapp
-                                        emisor_normalizado = normalizar_numero_whatsapp(emisor)
-                                        print(f"[WEBHOOK] Recibido de: {emisor} | Normalizado: {emisor_normalizado}")
-                                        
-                                        proveedores = db.query(Proveedor).all()
-                                        proveedor_encontrado = None
-                                        for p in proveedores:
-                                            if normalizar_numero_whatsapp(p.telefono) == emisor_normalizado:
-                                                proveedor_encontrado = p
-                                                break
-                                                
-                                        if proveedor_encontrado:
-                                            print(f"[WEBHOOK] Proveedor encontrado: ID {proveedor_encontrado.id} - {proveedor_encontrado.nombre}")
-                                            msg_type = message.get("type", "unknown")
-                                            contenido = ""
-                                            media_url = None
-                                            
-                                            if msg_type == "text":
-                                                contenido = message.get("text", {}).get("body", "")
-                                            else:
-                                                contenido_obj = message.get(msg_type, {})
-                                                if isinstance(contenido_obj, dict) and "caption" in contenido_obj:
-                                                    contenido = contenido_obj.get("caption", "")
-                                                else:
-                                                    contenido = f"[Mensaje {msg_type}]"
-                                                
-                                                # Si es de tipo imagen, intentamos descargarla y subirla a Cloudinary
-                                                if msg_type == "image" and isinstance(contenido_obj, dict) and "id" in contenido_obj:
-                                                    from app.services.whatsapp import descargar_y_subir_media_whatsapp
-                                                    media_id = contenido_obj["id"]
-                                                    media_url = descargar_y_subir_media_whatsapp(media_id)
-                                                    if not media_url:
-                                                        contenido = "[Imagen recibida, pero no se pudo descargar]"
-                                            
-                                            contactos = value.get("contacts", [])
-                                            nombre_perfil = contactos[0].get("profile", {}).get("name") if contactos else None
-                                            whatsapp_msg_id = message.get("id")
-                                            
-                                            context_id = message.get("context", {}).get("id")
-                                            reply_to_whatsapp_message_id = None
-                                            reply_to_text = None
-                                            reply_to_media_url = None
-                                            
-                                            if context_id:
-                                                print(f"[WEBHOOK] Mensaje entrante tiene reply context: {context_id}")
-                                                original_msg = db.query(MensajeProveedor).filter(
-                                                    MensajeProveedor.whatsapp_message_id == context_id
-                                                ).first()
-                                                if original_msg:
-                                                    print(f"[WEBHOOK] Mensaje original encontrado: {original_msg.id}")
-                                                    reply_to_whatsapp_message_id = context_id
-                                                    reply_to_text = original_msg.contenido
-                                                    reply_to_media_url = original_msg.media_url
-                                                else:
-                                                    print(f"[WEBHOOK] Mensaje original NO encontrado para context_id {context_id}")
-                                                    reply_to_whatsapp_message_id = context_id
-                                            
-                                            nuevo_mensaje = MensajeProveedor(
-                                                proveedor_id=proveedor_encontrado.id,
-                                                telefono=proveedor_encontrado.telefono, # Guardar el teléfono como está en la DB
-                                                nombre_perfil=nombre_perfil,
-                                                direccion="entrante",
-                                                tipo=msg_type,
-                                                contenido=contenido,
-                                                media_url=media_url,
-                                                whatsapp_message_id=whatsapp_msg_id,
-                                                reply_to_whatsapp_message_id=reply_to_whatsapp_message_id,
-                                                reply_to_text=reply_to_text,
-                                                reply_to_media_url=reply_to_media_url,
-                                                fecha_creacion=datetime.utcnow()
-                                            )
-                                            db.add(nuevo_mensaje)
-                                            db.commit()
-                                            print(f"[WEBHOOK] Mensaje de proveedor {proveedor_encontrado.telefono} guardado.")
+        for entry in data.get("entry", []) or []:
+            for change in entry.get("changes", []) or []:
+                value = change.get("value", {}) or {}
+                for s in value.get("statuses", []) or []:
+                    codigos = [e.get("code") for e in (s.get("errors") or []) if isinstance(e, dict)]
+                    resumen["statuses"].append(
+                        {"wamid": s.get("id"), "status": s.get("status"), "errors": codigos or None}
+                    )
+                resumen["messages"] += len(value.get("messages", []) or [])
+    except Exception:
+        pass
+    return resumen
+
+
+def procesar_statuses_webhook(statuses: list) -> list:
+    """Actualiza estados de forma idempotente. Nunca envía mensajes de WhatsApp."""
+    from app.database import SessionLocal
+    from app.services.notificaciones_whatsapp import aplicar_estado_webhook
+
+    resultados = []
+    db = SessionLocal()
+    try:
+        for status in statuses:
+            try:
+                r = aplicar_estado_webhook(db, status)
+            except Exception as e:
+                db.rollback()
+                r = f"error:{type(e).__name__}"
+            resultados.append(r)
+            print(f"[WEBHOOK_STATUS] wamid={status.get('id')} status={status.get('status')} -> {r}", flush=True)
+    finally:
+        db.close()
+    return resultados
+
+
+def procesar_evento_webhook(data: dict) -> None:
+    """
+    Procesa eventos de webhook (statuses y mensajes entrantes) de forma completamente
+    aislada fuera del event loop asíncrono de FastAPI (en un worker threadpool).
+    Evita bloquear el bucle de eventos con operaciones síncronas de base de datos,
+    descargas HTTP o subidas a Cloudinary.
+    """
+    try:
+        if not data or not isinstance(data, dict):
+            return
+
+        for entry in data.get("entry", []) or []:
+            for change in entry.get("changes", []) or []:
+                value = change.get("value", {}) or {}
+
+                # 1) Estados de mensajes salientes: SOLO actualizan BD, nunca envían mensajes.
+                if value.get("statuses"):
+                    procesar_statuses_webhook(value["statuses"])
+
+                # 2) Mensajes entrantes
+                if "messages" in value and len(value["messages"]) > 0:
+                    from app.database import SessionLocal
+                    from app.models.proveedor import Proveedor
+                    from app.models.mensaje_proveedor import MensajeProveedor
+                    from datetime import datetime
+
+                    db = SessionLocal()
+                    try:
+                        for message in value["messages"]:
+                            emisor = message.get("from")
+
+                            if emisor:
+                                from app.services.whatsapp import normalizar_numero_whatsapp
+                                emisor_normalizado = normalizar_numero_whatsapp(emisor)
+                                print(f"[WEBHOOK] Recibido de: {enmascarar_telefono(emisor_normalizado)}")
+
+                                proveedores = db.query(Proveedor).all()
+                                proveedor_encontrado = None
+                                for p in proveedores:
+                                    if normalizar_numero_whatsapp(p.telefono) == emisor_normalizado:
+                                        proveedor_encontrado = p
+                                        break
+
+                                if proveedor_encontrado:
+                                    print(f"[WEBHOOK] Proveedor encontrado: ID {proveedor_encontrado.id}")
+                                    if message.get("id") and db.query(MensajeProveedor.id).filter(
+                                        MensajeProveedor.whatsapp_message_id == message.get("id")
+                                    ).first():
+                                        print(f"[WEBHOOK] Mensaje duplicado {message.get('id')} ignorado (idempotente).")
+                                        continue
+                                    msg_type = message.get("type", "unknown")
+                                    contenido = ""
+                                    media_url = None
+
+                                    if msg_type == "text":
+                                        contenido = message.get("text", {}).get("body", "")
+                                    else:
+                                        contenido_obj = message.get(msg_type, {})
+                                        if isinstance(contenido_obj, dict) and "caption" in contenido_obj:
+                                            contenido = contenido_obj.get("caption", "")
                                         else:
-                                            print(f"[WEBHOOK] No se encontró proveedor para {emisor_normalizado}. Enviando auto-respuesta.")
-                                            texto_respuesta = (
-                                                "Hola 👋 Gracias por escribirnos.\n\n"
-                                                "Este número se usa únicamente para notificaciones automáticas de tus encargos.\n\n"
-                                                "Para atención personalizada, dudas, cambios o soporte, escríbenos a nuestro WhatsApp principal:\n\n"
-                                                "https://wa.me/573242697263\n\n"
-                                                "Con gusto te atendemos por ese canal."
-                                            )
-                                            
-                                            from app.services.whatsapp import enviar_mensaje_texto
-                                            enviar_mensaje_texto(emisor, texto_respuesta)
-                                            print(f"Respuesta automática enviada a {emisor}")
-                            finally:
-                                db.close()
+                                            contenido = f"[Mensaje {msg_type}]"
+
+                                        # Si es de tipo imagen, intentamos descargarla y subirla a Cloudinary
+                                        if msg_type == "image" and isinstance(contenido_obj, dict) and "id" in contenido_obj:
+                                            from app.services.whatsapp import descargar_y_subir_media_whatsapp
+                                            media_id = contenido_obj["id"]
+                                            media_url = descargar_y_subir_media_whatsapp(media_id)
+                                            if not media_url:
+                                                contenido = "[Imagen recibida, pero no se pudo descargar]"
+
+                                    contactos = value.get("contacts", [])
+                                    nombre_perfil = contactos[0].get("profile", {}).get("name") if contactos else None
+                                    whatsapp_msg_id = message.get("id")
+
+                                    context_id = message.get("context", {}).get("id")
+                                    reply_to_whatsapp_message_id = None
+                                    reply_to_text = None
+                                    reply_to_media_url = None
+
+                                    if context_id:
+                                        print(f"[WEBHOOK] Mensaje entrante tiene reply context: {context_id}")
+                                        original_msg = db.query(MensajeProveedor).filter(
+                                            MensajeProveedor.whatsapp_message_id == context_id
+                                        ).first()
+                                        if original_msg:
+                                            print(f"[WEBHOOK] Mensaje original encontrado: {original_msg.id}")
+                                            reply_to_whatsapp_message_id = context_id
+                                            reply_to_text = original_msg.contenido
+                                            reply_to_media_url = original_msg.media_url
+                                        else:
+                                            print(f"[WEBHOOK] Mensaje original NO encontrado para context_id {context_id}")
+                                            reply_to_whatsapp_message_id = context_id
+
+                                    nuevo_mensaje = MensajeProveedor(
+                                        proveedor_id=proveedor_encontrado.id,
+                                        telefono=proveedor_encontrado.telefono,  # Guardar el teléfono como está en la DB
+                                        nombre_perfil=nombre_perfil,
+                                        direccion="entrante",
+                                        tipo=msg_type,
+                                        contenido=contenido,
+                                        media_url=media_url,
+                                        whatsapp_message_id=whatsapp_msg_id,
+                                        reply_to_whatsapp_message_id=reply_to_whatsapp_message_id,
+                                        reply_to_text=reply_to_text,
+                                        reply_to_media_url=reply_to_media_url,
+                                        fecha_creacion=datetime.utcnow(),
+                                    )
+                                    db.add(nuevo_mensaje)
+                                    db.commit()
+                                    print(f"[WEBHOOK] Mensaje de proveedor {enmascarar_telefono(proveedor_encontrado.telefono)} guardado.")
+                                else:
+                                    from app.models.cliente import Cliente
+                                    cliente_encontrado = None
+                                    for c in db.query(Cliente).all():
+                                        if normalizar_numero_whatsapp(c.telefono) == emisor_normalizado:
+                                            cliente_encontrado = c
+                                            break
+
+                                    if cliente_encontrado:
+                                        # Cliente registrado: NO se envía auto-respuesta.
+                                        print(
+                                            f"[WEBHOOK] Mensaje de cliente registrado ID {cliente_encontrado.id} "
+                                            f"({enmascarar_telefono(emisor_normalizado)}). Tipo: {message.get('type')}. Sin auto-respuesta."
+                                        )
+                                        continue
+
+                                    print(f"[WEBHOOK] Contacto desconocido {enmascarar_telefono(emisor_normalizado)}. Enviando auto-respuesta.")
+                                    texto_respuesta = (
+                                        "Hola 👋 Gracias por escribirnos.\n\n"
+                                        "Este número se usa únicamente para notificaciones automáticas de tus encargos.\n\n"
+                                        "Para atención personalizada, dudas, cambios o soporte, escríbenos a nuestro WhatsApp principal:\n\n"
+                                        "https://wa.me/573242697263\n\n"
+                                        "Con gusto te atendemos por ese canal."
+                                    )
+
+                                    from app.services.whatsapp import enviar_mensaje_texto
+                                    enviar_mensaje_texto(emisor, texto_respuesta)
+                                    print(f"Respuesta automática enviada a {enmascarar_telefono(emisor_normalizado)}")
+                    finally:
+                        db.close()
     except Exception as e:
-        print("Error procesando webhook:", str(e))
-        
+        print("[WEBHOOK_ERROR] Error procesando webhook:", str(e), flush=True)
+
+
+@app.post("/webhook")
+async def recibir_webhook(request: Request, background_tasks: BackgroundTasks):
+    data = await request.json()
+    print("WEBHOOK_RECIBIDO:", resumir_webhook(data), flush=True)
+    # Ejecuta el procesamiento fuera del event loop vía threadpool de FastAPI
+    background_tasks.add_task(procesar_evento_webhook, data)
     return {"status": "ok"}

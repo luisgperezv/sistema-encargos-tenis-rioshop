@@ -19,6 +19,12 @@ from app.services.whatsapp import (
 )
 from app.services.utils import formatear_pesos
 from app.services.ventas import crear_venta_desde_encargo_si_no_existe
+from app.services.notificaciones_whatsapp import (
+    registrar_resultado_envio,
+    envio_reciente_en_vuelo,
+    validar_respuesta_meta_wamid,
+    consultar_envio_incierto_reciente,
+)
 from app.core.config import settings
 
 cloudinary.config(
@@ -211,6 +217,8 @@ def crear_encargo(
     db.refresh(nuevo_encargo)
 
     # 5. INTENTAR NOTIFICAR AL CLIENTE VÍA WHATSAPP
+    # La foto original (nuevo_encargo.foto) no se modifica; el servicio de WhatsApp
+    # genera y verifica una versión optimizada derivada de Cloudinary.
     image_url = nuevo_encargo.foto
     respuesta_whatsapp_cliente = None
     try:
@@ -239,33 +247,28 @@ def crear_encargo(
                 saldo=formatear_pesos(nuevo_encargo.saldo),
                 fecha_estimada=nuevo_encargo.fecha_entrega_estimada,
             )
-        print("WHATSAPP CLIENTE:", respuesta_whatsapp_cliente)
     except Exception as e:
-        print("Exception al enviar WhatsApp al cliente:", e)
-        respuesta_whatsapp_cliente = {"error": str(e)}
+        print("Exception al enviar WhatsApp al cliente:", type(e).__name__)
+        respuesta_whatsapp_cliente = {"error": {"code": "LOCAL_EXCEPTION", "message": str(e)}}
 
-    # Evaluar resultado del envío al cliente
-    cliente_notificado = True
-    det_msg = None
+    notif_cliente = registrar_resultado_envio(
+        db, encargo_id=nuevo_encargo.id, destinatario="cliente", tipo="confirmacion",
+        plantilla="confirmacion_encargo_foto" if image_url else "confirmacion_encargo",
+        respuesta=respuesta_whatsapp_cliente,
+    )
 
-    if not respuesta_whatsapp_cliente:
-        cliente_notificado = False
-        det_msg = "Respuesta vacía del servicio Meta WhatsApp"
-    elif isinstance(respuesta_whatsapp_cliente, dict) and respuesta_whatsapp_cliente.get("error"):
-        cliente_notificado = False
-        err_obj = respuesta_whatsapp_cliente["error"]
-        det_msg = err_obj.get("message") if isinstance(err_obj, dict) else str(err_obj)
-
-    if not cliente_notificado:
+    # "accepted" = Meta aceptó la solicitud. La entrega real llega luego por webhook.
+    if notif_cliente.estado != "accepted":
         # NO borrar el encargo de la BD. Conservar registro.
         # NO enviar notificación al proveedor si falló la notificación obligatoria al cliente.
+        db.expire(nuevo_encargo, ["notificaciones_whatsapp"])
         nuevo_encargo.mensaje_advertencia = (
-            f"El encargo fue creado en la base de datos, pero no fue posible enviar la notificación por WhatsApp al cliente ({det_msg}). "
+            f"El encargo fue creado en la base de datos, pero no fue posible enviar la notificación por WhatsApp al cliente ({notif_cliente.error_mensaje}). "
             f"No se envió notificación al proveedor."
         )
         return nuevo_encargo
 
-    # 6. SI CLIENTE FUE NOTIFICADO EXITOSAMENTE -> INTENTAR NOTIFICAR AL PROVEEDOR
+    # 6. SI WHATSAPP ACEPTÓ EL MENSAJE DEL CLIENTE -> INTENTAR NOTIFICAR AL PROVEEDOR
     respuesta_whatsapp_proveedor = None
     try:
         if image_url:
@@ -281,16 +284,18 @@ def crear_encargo(
                 referencia=nuevo_encargo.referencia,
                 talla_eur=nuevo_encargo.talla_eur,
             )
+    except Exception as e:
+        print("Error enviando template al proveedor:", type(e).__name__)
+        respuesta_whatsapp_proveedor = {"error": {"code": "LOCAL_EXCEPTION", "message": str(e)}}
 
-        print("WHATSAPP PROVEEDOR:", respuesta_whatsapp_proveedor)
+    notif_prov = registrar_resultado_envio(
+        db, encargo_id=nuevo_encargo.id, destinatario="proveedor", tipo="proveedor",
+        plantilla="notificacion_proveedor_foto" if image_url else "notificacion_proveedor_encargo",
+        respuesta=respuesta_whatsapp_proveedor, proveedor_id=proveedor.id,
+    )
 
-        if (
-            respuesta_whatsapp_proveedor
-            and isinstance(respuesta_whatsapp_proveedor, dict)
-            and "messages" in respuesta_whatsapp_proveedor
-            and len(respuesta_whatsapp_proveedor["messages"]) > 0
-        ):
-            wamid = respuesta_whatsapp_proveedor["messages"][0]["id"]
+    if notif_prov.estado == "accepted":
+        try:
             nuevo_msg = MensajeProveedor(
                 proveedor_id=proveedor.id,
                 telefono=proveedor.telefono,
@@ -299,25 +304,21 @@ def crear_encargo(
                 tipo="image" if image_url else "text",
                 contenido=f"Talla EUR: {nuevo_encargo.talla_eur}",
                 media_url=image_url,
-                whatsapp_message_id=wamid,
+                whatsapp_message_id=notif_prov.wamid,
             )
             db.add(nuevo_msg)
             db.commit()
-            print(f"[AUTO_MSG] Mensaje saliente automatico persistido en BD. wamid: {wamid}", flush=True)
-        elif isinstance(respuesta_whatsapp_proveedor, dict) and respuesta_whatsapp_proveedor.get("error"):
-            err_prov = respuesta_whatsapp_proveedor["error"]
-            msg_prov = err_prov.get("message") if isinstance(err_prov, dict) else str(err_prov)
-            nuevo_encargo.mensaje_advertencia = (
-                f"El encargo fue creado y el cliente fue notificado, pero no fue posible notificar al proveedor por WhatsApp ({msg_prov}). "
-                f"Puede utilizar la opción 'Reenviar a proveedor' más tarde."
-            )
-    except Exception as e:
-        print("Error enviando template al proveedor:", e)
+            print(f"[AUTO_MSG] Mensaje saliente automatico persistido en BD. wamid: {notif_prov.wamid}", flush=True)
+        except Exception as e:
+            db.rollback()
+            print("Error persistiendo mensaje de proveedor:", type(e).__name__)
+    else:
         nuevo_encargo.mensaje_advertencia = (
-            f"El encargo fue creado y el cliente fue notificado, pero ocurrió una excepción al notificar al proveedor: {e}. "
+            f"El encargo fue creado y WhatsApp aceptó el mensaje del cliente, pero no fue posible notificar al proveedor ({notif_prov.error_mensaje}). "
             f"Puede utilizar la opción 'Reenviar a proveedor' más tarde."
         )
 
+    db.expire(nuevo_encargo, ["notificaciones_whatsapp"])
     return nuevo_encargo
 
 
@@ -380,7 +381,27 @@ def reenviar_encargo_proveedor(
     db: Session = Depends(get_db),
     current_user: str = Depends(get_current_user),
 ):
-    encargo = db.query(Encargo).filter(Encargo.id == encargo_id).first()
+    """
+    Reenvía de forma controlada la notificación del encargo al proveedor por WhatsApp.
+    Permite seleccionar un proveedor alternativo en caso de reasignación.
+    Protegido contra concurrencia con SELECT ... FOR UPDATE NOWAIT y ventana anti-duplicado.
+    Considera éxito ÚNICAMENTE una respuesta válida de Meta que contenga un wamid.
+    """
+    # 1. Bloqueo atómico a nivel de fila en PostgreSQL para evitar reintentos concurrentes
+    try:
+        encargo = (
+            db.query(Encargo)
+            .options(joinedload(Encargo.proveedor))
+            .filter(Encargo.id == encargo_id)
+            .with_for_update(nowait=True)
+            .first()
+        )
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Hay una operación concurrente en curso sobre este encargo. Por favor espere unos segundos.",
+        )
 
     if not encargo:
         raise HTTPException(status_code=404, detail="El encargo no existe")
@@ -405,56 +426,99 @@ def reenviar_encargo_proveedor(
             detail="Este encargo no tiene proveedor asignado ni se especificó uno para el reenvío",
         )
 
+    incierto_reciente_prov = consultar_envio_incierto_reciente(encargo.id, "proveedor")
+    if incierto_reciente_prov:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Existe un envío reciente aceptado por Meta (wamid={incierto_reciente_prov.get('wamid')}) "
+                f"cuya persistencia local falló (rollback). No se permite el reenvío automático. "
+                f"Verifique la entrega con el proveedor antes de intentar un nuevo envío."
+            ),
+        )
+
+    if envio_reciente_en_vuelo(db, encargo.id, "proveedor"):
+        raise HTTPException(
+            status_code=409,
+            detail="Ya se envió una notificación al proveedor hace unos segundos. Espere antes de reintentar.",
+        )
+
     try:
-        if encargo.foto:
-            respuesta = enviar_template_proveedor_foto(
-                numero=proveedor_destino.telefono,
-                image_url=encargo.foto,
-                referencia=encargo.referencia,
-                talla_eur=encargo.talla_eur,
-            )
-        else:
-            respuesta = enviar_template_proveedor_encargo(
-                numero=proveedor_destino.telefono,
-                referencia=encargo.referencia,
-                talla_eur=encargo.talla_eur,
-            )
+        try:
+            if encargo.foto:
+                respuesta = enviar_template_proveedor_foto(
+                    numero=proveedor_destino.telefono,
+                    image_url=encargo.foto,
+                    referencia=encargo.referencia,
+                    talla_eur=encargo.talla_eur,
+                )
+            else:
+                respuesta = enviar_template_proveedor_encargo(
+                    numero=proveedor_destino.telefono,
+                    referencia=encargo.referencia,
+                    talla_eur=encargo.talla_eur,
+                )
+        except Exception as e:
+            print("Error en llamada a WhatsApp proveedor:", e)
+            respuesta = {"error": {"code": "CLIENT_EXCEPTION", "message": str(e)}}
 
-        print("REENVÍO WHATSAPP PROVEEDOR:", respuesta)
+        wamid_valido, error_meta = validar_respuesta_meta_wamid(respuesta)
+        print("[REENVÍO WA PROV]", f"wamid={wamid_valido}" if wamid_valido else f"error={error_meta}")
 
-        if respuesta.get("error"):
+        notif = registrar_resultado_envio(
+            db, encargo_id=encargo.id, destinatario="proveedor", tipo="proveedor",
+            plantilla="notificacion_proveedor_foto" if encargo.foto else "notificacion_proveedor_encargo",
+            respuesta=respuesta if isinstance(respuesta, dict) else {"error": {"message": str(respuesta)}},
+            proveedor_id=proveedor_destino.id,
+        )
+
+        if not wamid_valido:
             raise HTTPException(
                 status_code=400,
-                detail=respuesta["error"].get("message", "Error enviando WhatsApp"),
+                detail=error_meta or notif.error_mensaje or "No se pudo reenviar la notificación al proveedor por WhatsApp.",
             )
 
-        # Persistir mensaje automático enviado en base de datos
-        if respuesta and "messages" in respuesta and len(respuesta["messages"]) > 0:
-            wamid = respuesta["messages"][0]["id"]
-            nuevo_msg = MensajeProveedor(
-                proveedor_id=proveedor_destino.id,
-                telefono=proveedor_destino.telefono,
-                nombre_perfil=None,
-                direccion="saliente",
-                tipo="image" if encargo.foto else "text",
-                contenido=f"Talla EUR: {encargo.talla_eur}",
-                media_url=encargo.foto,
-                whatsapp_message_id=wamid
+        if notif.estado == "incierto":
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"Meta aceptó el mensaje (wamid={notif.wamid}), pero ocurrió un fallo en la base de datos local "
+                    f"y la transacción fue revertida (rollback). El estado no quedó guardado en el sistema. "
+                    f"Estado incierto: NO reenviar automáticamente. Verifique la entrega con el proveedor antes de intentar un nuevo envío."
+                ),
             )
-            db.add(nuevo_msg)
-            db.commit()
-            print(f"[AUTO_MSG_REENVIO] Mensaje saliente automatico reenviado persistido en BD. wamid: {wamid}", flush=True)
+
+        # Persistir mensaje automático enviado en base de datos si el intento fue exitoso y persistido
+        if wamid_valido and getattr(notif, "persistencia_exitosa", True):
+            try:
+                nuevo_msg = MensajeProveedor(
+                    proveedor_id=proveedor_destino.id,
+                    telefono=proveedor_destino.telefono,
+                    nombre_perfil=None,
+                    direccion="saliente",
+                    tipo="image" if encargo.foto else "text",
+                    contenido=f"Talla EUR: {encargo.talla_eur}",
+                    media_url=encargo.foto,
+                    whatsapp_message_id=wamid_valido,
+                    fecha_creacion=datetime.utcnow(),
+                )
+                db.add(nuevo_msg)
+                db.commit()
+                print(f"[AUTO_MSG_REENVIO] Mensaje saliente automatico reenviado persistido en BD. wamid: {wamid_valido}", flush=True)
+            except Exception as e_msg:
+                print(f"[WARN] Error guardando MensajeProveedor saliente: {e_msg}", flush=True)
 
         return {
-            "mensaje": "Encargo reenviado al proveedor correctamente",
+            "mensaje": "WhatsApp aceptó el mensaje para el proveedor. El estado de entrega se actualizará automáticamente.",
             "encargo_id": encargo.id,
             "proveedor": proveedor_destino.nombre,
-            "respuesta_whatsapp": respuesta,
+            "estado": notif.estado,
+            "intento": notif.intento,
+            "wamid": wamid_valido,
         }
 
     except HTTPException:
         raise
-
     except Exception as e:
         print("Error reenviando encargo al proveedor:", e)
         raise HTTPException(
@@ -462,19 +526,31 @@ def reenviar_encargo_proveedor(
             detail="Error reenviando encargo al proveedor",
         )
 
-
 @router.post("/encargos/{encargo_id}/reenviar-cliente")
 def reenviar_encargo_cliente(
     encargo_id: int,
     db: Session = Depends(get_db),
     current_user: str = Depends(get_current_user),
 ):
-    encargo = (
-        db.query(Encargo)
-        .options(joinedload(Encargo.cliente))
-        .filter(Encargo.id == encargo_id)
-        .first()
-    )
+    """
+    Reenvía la notificación por WhatsApp de confirmación de encargo al cliente.
+    Protegido contra concurrencia con SELECT ... FOR UPDATE NOWAIT y ventana anti-duplicado.
+    Considera éxito ÚNICAMENTE una respuesta válida de Meta que contenga un wamid.
+    """
+    try:
+        encargo = (
+            db.query(Encargo)
+            .options(joinedload(Encargo.cliente))
+            .filter(Encargo.id == encargo_id)
+            .with_for_update(nowait=True)
+            .first()
+        )
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Hay una operación concurrente en curso sobre este encargo. Por favor espere unos segundos.",
+        )
 
     if not encargo:
         raise HTTPException(status_code=404, detail="El encargo especificado no existe.")
@@ -523,50 +599,86 @@ def reenviar_encargo_cliente(
     image_url = encargo.foto
     respuesta_whatsapp = None
 
+    incierto_reciente_cli = consultar_envio_incierto_reciente(encargo.id, "cliente")
+    if incierto_reciente_cli:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Existe un envío reciente aceptado por Meta (wamid={incierto_reciente_cli.get('wamid')}) "
+                f"cuya persistencia local falló (rollback). No se permite el reenvío automático. "
+                f"Verifique la entrega con el cliente antes de intentar un nuevo envío."
+            ),
+        )
+
+    if envio_reciente_en_vuelo(db, encargo.id, "cliente"):
+        raise HTTPException(
+            status_code=409,
+            detail="Ya se envió una notificación al cliente hace unos segundos. Espere antes de reintentar.",
+        )
+
     try:
-        if image_url:
-            respuesta_whatsapp = enviar_template_confirmacion_encargo_foto(
-                numero=telefono_cliente_norm,
-                image_url=image_url,
-                nombre=cliente.nombre,
-                referencia=encargo.referencia,
-                talla_col=encargo.talla_col,
-                talla_eur=encargo.talla_eur,
-                precio=formatear_pesos(encargo.precio),
-                abono=formatear_pesos(encargo.abono),
-                saldo=formatear_pesos(encargo.saldo),
-                fecha_estimada=encargo.fecha_entrega_estimada,
-            )
-        else:
-            respuesta_whatsapp = enviar_template_confirmacion_encargo(
-                numero=telefono_cliente_norm,
-                nombre=cliente.nombre,
-                referencia=encargo.referencia,
-                talla_col=encargo.talla_col,
-                talla_eur=encargo.talla_eur,
-                precio=formatear_pesos(encargo.precio),
-                abono=formatear_pesos(encargo.abono),
-                saldo=formatear_pesos(encargo.saldo),
-                fecha_estimada=encargo.fecha_entrega_estimada,
-            )
+        try:
+            if image_url:
+                respuesta_whatsapp = enviar_template_confirmacion_encargo_foto(
+                    numero=telefono_cliente_norm,
+                    image_url=image_url,
+                    nombre=cliente.nombre,
+                    referencia=encargo.referencia,
+                    talla_col=encargo.talla_col,
+                    talla_eur=encargo.talla_eur,
+                    precio=formatear_pesos(encargo.precio),
+                    abono=formatear_pesos(encargo.abono),
+                    saldo=formatear_pesos(encargo.saldo),
+                    fecha_estimada=encargo.fecha_entrega_estimada,
+                )
+            else:
+                respuesta_whatsapp = enviar_template_confirmacion_encargo(
+                    numero=telefono_cliente_norm,
+                    nombre=cliente.nombre,
+                    referencia=encargo.referencia,
+                    talla_col=encargo.talla_col,
+                    talla_eur=encargo.talla_eur,
+                    precio=formatear_pesos(encargo.precio),
+                    abono=formatear_pesos(encargo.abono),
+                    saldo=formatear_pesos(encargo.saldo),
+                    fecha_estimada=encargo.fecha_entrega_estimada,
+                )
+        except Exception as e:
+            print("Error en llamada a WhatsApp cliente:", e)
+            respuesta_whatsapp = {"error": {"code": "CLIENT_EXCEPTION", "message": str(e)}}
 
-        print("REENVÍO WHATSAPP CLIENTE:", respuesta_whatsapp)
+        wamid_valido, error_meta = validar_respuesta_meta_wamid(respuesta_whatsapp)
+        print("[REENVÍO WA CLIENTE]", f"wamid={wamid_valido}" if wamid_valido else f"error={error_meta}")
 
-        if not respuesta_whatsapp or respuesta_whatsapp.get("error"):
-            det_msg = "Error desconocido al enviar WhatsApp al cliente"
-            if respuesta_whatsapp and respuesta_whatsapp.get("error"):
-                err_obj = respuesta_whatsapp["error"]
-                det_msg = err_obj.get("message") if isinstance(err_obj, dict) else str(err_obj)
+        notif = registrar_resultado_envio(
+            db, encargo_id=encargo.id, destinatario="cliente", tipo="confirmacion",
+            plantilla="confirmacion_encargo_foto" if image_url else "confirmacion_encargo",
+            respuesta=respuesta_whatsapp if isinstance(respuesta_whatsapp, dict) else {"error": {"message": str(respuesta_whatsapp)}},
+        )
+
+        if not wamid_valido:
             raise HTTPException(
                 status_code=400,
-                detail=f"No se pudo notificar al cliente por WhatsApp: {det_msg}"
+                detail=error_meta or notif.error_mensaje or "No se pudo notificar al cliente por WhatsApp.",
+            )
+
+        if notif.estado == "incierto":
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"Meta aceptó el mensaje (wamid={notif.wamid}), pero ocurrió un fallo en la base de datos local "
+                    f"y la transacción fue revertida (rollback). El estado no quedó guardado en el sistema. "
+                    f"Estado incierto: NO reenviar automáticamente. Verifique la entrega con el cliente antes de intentar un nuevo envío."
+                ),
             )
 
         return {
-            "mensaje": "Notificación reenviada al cliente por WhatsApp correctamente",
+            "mensaje": "WhatsApp aceptó el mensaje para el cliente. El estado de entrega se actualizará automáticamente.",
             "encargo_id": encargo.id,
             "cliente": cliente.nombre,
-            "respuesta_whatsapp": respuesta_whatsapp,
+            "estado": notif.estado,
+            "intento": notif.intento,
+            "wamid": wamid_valido,
         }
 
     except HTTPException:
@@ -654,7 +766,7 @@ def actualizar_estado(
                 status_code=400,
                 detail="No se puede entregar un encargo sin registrar costos válidos (costo_total debe ser mayor a 0)",
             )
-        
+
         if encargo.estado == "entregado" and encargo.metodo_pago:
             if data.metodo_pago and data.metodo_pago != encargo.metodo_pago:
                 raise HTTPException(
@@ -667,7 +779,7 @@ def actualizar_estado(
                     status_code=400,
                     detail="El método de pago es obligatorio para entregar el encargo",
                 )
-            
+
             metodos_permitidos = [
                 "Efectivo",
                 "Transferencia",
@@ -720,15 +832,20 @@ def actualizar_estado(
             try:
                 image_url = encargo.foto
 
-                enviar_template_encargo_en_local(
+                resp_local = enviar_template_encargo_en_local(
                     numero=encargo.cliente.telefono,
                     image_url=image_url,
                     nombre=encargo.cliente.nombre,
                     referencia=encargo.referencia,
                     saldo=formatear_pesos(encargo.saldo),
                 )
+                registrar_resultado_envio(
+                    db, encargo_id=encargo.id, destinatario="cliente", tipo="en_local",
+                    plantilla="encargo_en_local_foto", respuesta=resp_local,
+                )
+                db.expire(encargo, ["notificaciones_whatsapp"])
             except Exception as e:
-                print("Error enviando WhatsApp en local:", e)
+                print("Error enviando WhatsApp en local:", type(e).__name__, e)
 
     return encargo
 
