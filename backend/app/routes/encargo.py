@@ -371,6 +371,20 @@ def obtener_encargo(
 
     return encargo
 
+def _es_lock_not_available(e: Exception) -> bool:
+    """
+    Verifica si la excepción corresponde estrictamente al error de PostgreSQL
+    SQLSTATE 55P03 (lock_not_available), que ocurre cuando una fila ya está
+    bloqueada por otra transacción y se ejecuta SELECT ... FOR UPDATE NOWAIT.
+    """
+    orig = getattr(e, "orig", None)
+    pgcode = (
+        getattr(orig, "pgcode", None)
+        or getattr(orig, "sqlstate", None)
+        or getattr(e, "pgcode", None)
+    )
+    return str(pgcode).strip().upper() == "55P03"
+
 class ReenviarProveedorRequest(BaseModel):
     proveedor_id: int | None = None
 
@@ -391,16 +405,23 @@ def reenviar_encargo_proveedor(
     try:
         encargo = (
             db.query(Encargo)
-            .options(joinedload(Encargo.proveedor))
             .filter(Encargo.id == encargo_id)
             .with_for_update(nowait=True)
             .first()
         )
-    except Exception:
+    except Exception as e:
         db.rollback()
+        if _es_lock_not_available(e):
+            raise HTTPException(
+                status_code=409,
+                detail="Hay una operación concurrente en curso sobre este encargo. Por favor espere unos segundos.",
+            )
+        orig = getattr(e, "orig", None)
+        sqlstate = getattr(orig, "pgcode", None) or getattr(orig, "sqlstate", None) or getattr(e, "pgcode", None)
+        print(f"[ERROR] Error al bloquear encargo {encargo_id} para reenvio a proveedor: tipo={type(e).__name__}, sqlstate={sqlstate}", flush=True)
         raise HTTPException(
-            status_code=409,
-            detail="Hay una operación concurrente en curso sobre este encargo. Por favor espere unos segundos.",
+            status_code=500,
+            detail="Error interno al consultar el encargo.",
         )
 
     if not encargo:
@@ -540,16 +561,23 @@ def reenviar_encargo_cliente(
     try:
         encargo = (
             db.query(Encargo)
-            .options(joinedload(Encargo.cliente))
             .filter(Encargo.id == encargo_id)
             .with_for_update(nowait=True)
             .first()
         )
-    except Exception:
+    except Exception as e:
         db.rollback()
+        if _es_lock_not_available(e):
+            raise HTTPException(
+                status_code=409,
+                detail="Hay una operación concurrente en curso sobre este encargo. Por favor espere unos segundos.",
+            )
+        orig = getattr(e, "orig", None)
+        sqlstate = getattr(orig, "pgcode", None) or getattr(orig, "sqlstate", None) or getattr(e, "pgcode", None)
+        print(f"[ERROR] Error al bloquear encargo {encargo_id} para reenvio a cliente: tipo={type(e).__name__}, sqlstate={sqlstate}", flush=True)
         raise HTTPException(
-            status_code=409,
-            detail="Hay una operación concurrente en curso sobre este encargo. Por favor espere unos segundos.",
+            status_code=500,
+            detail="Error interno al consultar el encargo.",
         )
 
     if not encargo:
