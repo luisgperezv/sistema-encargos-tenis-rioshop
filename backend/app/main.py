@@ -693,14 +693,12 @@ def procesar_evento_webhook(data: dict) -> None:
                                             break
 
                                     if cliente_encontrado:
-                                        # Cliente registrado: NO se envía auto-respuesta.
                                         print(
                                             f"[WEBHOOK] Mensaje de cliente registrado ID {cliente_encontrado.id} "
-                                            f"({enmascarar_telefono(emisor_normalizado)}). Tipo: {message.get('type')}. Sin auto-respuesta."
+                                            f"({enmascarar_telefono(emisor_normalizado)}). Enviando auto-respuesta."
                                         )
-                                        continue
-
-                                    print(f"[WEBHOOK] Contacto desconocido {enmascarar_telefono(emisor_normalizado)}. Enviando auto-respuesta.")
+                                    else:
+                                        print(f"[WEBHOOK] Contacto desconocido {enmascarar_telefono(emisor_normalizado)}. Enviando auto-respuesta.")
                                     texto_respuesta = (
                                         "Hola 👋 Gracias por escribirnos.\n\n"
                                         "Este número se usa únicamente para notificaciones automáticas de tus encargos.\n\n"
