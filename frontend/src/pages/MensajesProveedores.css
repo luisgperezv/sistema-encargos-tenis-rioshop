@@ -136,6 +136,9 @@
   background-color: var(--bg-main);
   background-image: radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px);
   background-size: 20px 20px;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
 }
 
 .chat-header {
@@ -503,4 +506,45 @@
     padding: 0 1.25rem;
     height: 2.5rem;
   }
+
+  .btn-scroll-bottom {
+    bottom: 70px;
+    right: 16px;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.8rem;
+  }
+}
+
+/* Botón flotante para mensajes recientes */
+.btn-scroll-bottom {
+  position: absolute;
+  bottom: 80px;
+  right: 24px;
+  background-color: rgba(17, 24, 39, 0.9);
+  color: var(--text-primary);
+  border: 1px solid var(--accent-blue);
+  border-radius: var(--radius-full);
+  padding: 0.45rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  z-index: 20;
+  transition: all var(--transition-fast);
+  backdrop-filter: blur(8px);
+}
+
+.btn-scroll-bottom:hover {
+  background-color: var(--accent-blue);
+  color: #ffffff;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+}
+
+.btn-scroll-bottom-icon {
+  font-size: 1rem;
+  font-weight: bold;
 }

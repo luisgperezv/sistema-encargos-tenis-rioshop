@@ -6,8 +6,9 @@ import {
   enviarMensajeProveedorRequest,
 } from "../services/api";
 import "./MensajesProveedores.css";
+import Layout from "../components/Layout";
 
-function ChatImage({ src }: { src: string }) {
+function ChatImage({ src, onLoad }: { src: string; onLoad?: () => void }) {
   const [hasError, setHasError] = useState(false);
 
   if (hasError) {
@@ -19,30 +20,55 @@ function ChatImage({ src }: { src: string }) {
   }
 
   return (
-    <img 
-      src={src} 
-      alt="Adjunto" 
+    <img
+      src={src}
+      alt="Adjunto"
       className="chat-image-preview"
-      onError={() => setHasError(true)} 
+      onLoad={onLoad}
+      onError={() => setHasError(true)}
       onClick={() => window.open(src, "_blank")}
     />
   );
 }
-
-import Layout from "../components/Layout";
 
 function MensajesProveedores() {
   const [conversaciones, setConversaciones] = useState<any[]>([]);
   const [telefonoActivo, setTelefonoActivo] = useState<string | null>(null);
   const [proveedorActivoNombre, setProveedorActivoNombre] = useState<string>("");
   const [mensajes, setMensajes] = useState<any[]>([]);
+  const [cargandoMensajes, setCargandoMensajes] = useState<boolean>(false);
   const [nuevoMensaje, setNuevoMensaje] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [showMobileChat, setShowMobileChat] = useState(false);
+  const [showScrollBottomBtn, setShowScrollBottomBtn] = useState(false);
+
   const mensajesEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const isAtBottomRef = useRef<boolean>(true);
+  const isInitialLoadRef = useRef<boolean>(true);
+  const debeScrollAlEnviarRef = useRef<boolean>(false);
+  const prevMensajesCountRef = useRef<number>(0);
+  const telefonoActivoRef = useRef<string | null>(null);
+
+  const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scrollRafRef = useRef<number | null>(null);
+
+  const limpiarScrollPendiente = () => {
+    if (scrollTimerRef.current !== null) {
+      clearTimeout(scrollTimerRef.current);
+      scrollTimerRef.current = null;
+    }
+    if (scrollRafRef.current !== null) {
+      cancelAnimationFrame(scrollRafRef.current);
+      scrollRafRef.current = null;
+    }
+  };
 
   useEffect(() => {
     cargarConversaciones();
+    return () => {
+      limpiarScrollPendiente();
+    };
   }, []);
 
   useEffect(() => {
@@ -51,9 +77,107 @@ function MensajesProveedores() {
     }
   }, [telefonoActivo]);
 
+  const scrollToBottom = (behavior: ScrollBehavior = "auto") => {
+    const container = chatContainerRef.current;
+    if (container) {
+      if (behavior === "auto") {
+        container.scrollTop = container.scrollHeight;
+      } else {
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: "smooth",
+        });
+      }
+    } else if (mensajesEndRef.current) {
+      mensajesEndRef.current.scrollIntoView({ behavior });
+    }
+  };
+
+  const checkIfAtBottom = () => {
+    const container = chatContainerRef.current;
+    if (!container) return true;
+    const threshold = 120; // px tolerance
+    const distance = container.scrollHeight - container.scrollTop - container.clientHeight;
+    return distance <= threshold;
+  };
+
+  const handleScroll = () => {
+    const atBottom = checkIfAtBottom();
+    isAtBottomRef.current = atBottom;
+    setShowScrollBottomBtn(!atBottom);
+  };
+
+  const handleMediaLoad = () => {
+    if (isAtBottomRef.current && chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  };
+
   useEffect(() => {
-    scrollToBottom();
-  }, [mensajes]);
+    if (cargandoMensajes) {
+      return;
+    }
+
+    if (isInitialLoadRef.current) {
+      isAtBottomRef.current = true;
+      setShowScrollBottomBtn(false);
+
+      limpiarScrollPendiente();
+      scrollToBottom("auto");
+
+      scrollRafRef.current = requestAnimationFrame(() => {
+        scrollToBottom("auto");
+        scrollTimerRef.current = setTimeout(() => {
+          scrollToBottom("auto");
+          isInitialLoadRef.current = false;
+          scrollTimerRef.current = null;
+          scrollRafRef.current = null;
+        }, 50);
+      });
+
+      prevMensajesCountRef.current = mensajes.length;
+      return () => {
+        limpiarScrollPendiente();
+      };
+    }
+
+    if (debeScrollAlEnviarRef.current) {
+      debeScrollAlEnviarRef.current = false;
+      limpiarScrollPendiente();
+      scrollRafRef.current = requestAnimationFrame(() => {
+        scrollToBottom("smooth");
+        scrollRafRef.current = null;
+      });
+      prevMensajesCountRef.current = mensajes.length;
+      return () => {
+        limpiarScrollPendiente();
+      };
+    }
+
+    const isNewIncoming = mensajes.length > prevMensajesCountRef.current;
+    if (isNewIncoming) {
+      if (isAtBottomRef.current) {
+        scrollToBottom("smooth");
+      } else {
+        setShowScrollBottomBtn(true);
+      }
+    }
+
+    prevMensajesCountRef.current = mensajes.length;
+  }, [mensajes, cargandoMensajes]);
+
+  useEffect(() => {
+    if (showMobileChat && telefonoActivo && !cargandoMensajes) {
+      limpiarScrollPendiente();
+      scrollRafRef.current = requestAnimationFrame(() => {
+        scrollToBottom("auto");
+        scrollRafRef.current = null;
+      });
+      return () => {
+        limpiarScrollPendiente();
+      };
+    }
+  }, [showMobileChat, telefonoActivo, cargandoMensajes]);
 
   const cargarConversaciones = async () => {
     try {
@@ -67,17 +191,30 @@ function MensajesProveedores() {
   };
 
   const cargarMensajes = async (telefono: string) => {
+    setCargandoMensajes(true);
     try {
       const data = await obtenerMensajesProveedorRequest(telefono);
+      if (telefonoActivoRef.current !== telefono) return;
       if (Array.isArray(data)) {
         setMensajes(data);
       }
     } catch (error) {
       console.error("Error al cargar mensajes:", error);
+    } finally {
+      if (telefonoActivoRef.current === telefono) {
+        setCargandoMensajes(false);
+      }
     }
   };
 
   const seleccionarConversacion = (telefono: string, nombre: string) => {
+    if (telefono !== telefonoActivo) {
+      limpiarScrollPendiente();
+      isInitialLoadRef.current = true;
+      prevMensajesCountRef.current = 0;
+      setMensajes([]);
+    }
+    telefonoActivoRef.current = telefono;
     setTelefonoActivo(telefono);
     setProveedorActivoNombre(nombre);
     setShowMobileChat(true);
@@ -87,13 +224,22 @@ function MensajesProveedores() {
     setShowMobileChat(false);
   };
 
+  const handleScrollToRecent = () => {
+    isAtBottomRef.current = true;
+    setShowScrollBottomBtn(false);
+    scrollToBottom("smooth");
+  };
+
   const enviarMensaje = async () => {
-    if (!nuevoMensaje.trim() || !telefonoActivo || enviando) return;
+    if (!nuevoMensaje.trim() || !telefonoActivo || enviando || cargandoMensajes) return;
 
     setEnviando(true);
     try {
       const data = await enviarMensajeProveedorRequest(telefonoActivo, nuevoMensaje);
       if (data && data.id) {
+        isAtBottomRef.current = true;
+        setShowScrollBottomBtn(false);
+        debeScrollAlEnviarRef.current = true;
         setMensajes((prev) => [...prev, data]);
         setNuevoMensaje("");
         cargarConversaciones();
@@ -106,10 +252,6 @@ function MensajesProveedores() {
     } finally {
       setEnviando(false);
     }
-  };
-
-  const scrollToBottom = () => {
-    mensajesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -133,7 +275,7 @@ function MensajesProveedores() {
       const ultimoEntrante = mensajesEntrantes[mensajesEntrantes.length - 1];
       const fechaUltimo = new Date(ultimoEntrante.fecha_creacion + "Z");
       const ahora = new Date();
-      
+
       const difMilisegundos = ahora.getTime() - fechaUltimo.getTime();
       const horasPasadas = difMilisegundos / (1000 * 60 * 60);
 
@@ -216,19 +358,25 @@ function MensajesProveedores() {
 
           {(ventanaExpirada || noHayMensajesEntrantes) && (
             <div className="alerta-expirada">
-              {noHayMensajesEntrantes 
+              {noHayMensajesEntrantes
                 ? "No puedes enviar un mensaje libre porque el proveedor aún no ha iniciado una conversación."
                 : "La ventana de 24 horas expiró. El proveedor debe escribir nuevamente o debes usar una plantilla aprobada."}
             </div>
           )}
 
-          <div className="chat-mensajes">
-            {mensajes.length === 0 ? (
+          <div
+            className="chat-mensajes"
+            ref={chatContainerRef}
+            onScroll={handleScroll}
+          >
+            {cargandoMensajes ? (
+              <div className="empty-state">Cargando mensajes...</div>
+            ) : mensajes.length === 0 ? (
               <div className="empty-state">No hay mensajes con este proveedor.</div>
             ) : (
               mensajes.map((msg, index) => {
                 const mostrarFecha = index === 0 || formatDate(mensajes[index - 1].fecha_creacion) !== formatDate(msg.fecha_creacion);
-                
+
                 return (
                   <div key={msg.id} className="mensaje-wrapper">
                     {mostrarFecha && (
@@ -251,13 +399,14 @@ function MensajesProveedores() {
                                 className="mensaje-reply-image"
                                 src={msg.reply_to_media_url}
                                 alt="Producto original"
+                                onLoad={handleMediaLoad}
                                 onClick={() => window.open(msg.reply_to_media_url, "_blank")}
                                 onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                               />
                             )}
                           </div>
                         )}
-                        {msg.media_url && <ChatImage src={msg.media_url} />}
+                        {msg.media_url && <ChatImage src={msg.media_url} onLoad={handleMediaLoad} />}
                         {msg.contenido && msg.contenido !== "[Mensaje image]" && (
                           <div className="mensaje-texto">{msg.contenido}</div>
                         )}
@@ -274,6 +423,19 @@ function MensajesProveedores() {
             <div ref={mensajesEndRef} />
           </div>
 
+          {showScrollBottomBtn && (
+            <button
+              type="button"
+              className="btn-scroll-bottom"
+              onClick={handleScrollToRecent}
+              title="Ir a mensajes recientes"
+              aria-label="Ir a mensajes recientes"
+            >
+              <span className="btn-scroll-bottom-icon">↓</span>
+              <span className="btn-scroll-bottom-text">Mensajes recientes</span>
+            </button>
+          )}
+
           <div className="chat-input-area">
             <input
               type="text"
@@ -282,12 +444,12 @@ function MensajesProveedores() {
               value={nuevoMensaje}
               onChange={(e) => setNuevoMensaje(e.target.value)}
               onKeyDown={handleKeyDown}
-              disabled={ventanaExpirada || enviando || noHayMensajesEntrantes}
+              disabled={ventanaExpirada || enviando || noHayMensajesEntrantes || cargandoMensajes}
             />
             <button
               className="btn-enviar"
               onClick={enviarMensaje}
-              disabled={!nuevoMensaje.trim() || ventanaExpirada || enviando || noHayMensajesEntrantes}
+              disabled={!nuevoMensaje.trim() || ventanaExpirada || enviando || noHayMensajesEntrantes || cargandoMensajes}
             >
               {enviando ? "..." : "Enviar"}
             </button>
