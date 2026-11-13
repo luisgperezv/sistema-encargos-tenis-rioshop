@@ -118,6 +118,14 @@ const OPCIONES_FILTRO_ESTADO = [
   { valor: "cancelado", etiqueta: "Cancelado" },
 ];
 
+const OPCIONES_ESTADO_TARJETA = [
+  { valor: "pendiente", etiqueta: "Pendiente" },
+  { valor: "despachado", etiqueta: "Despachado" },
+  { valor: "en_local", etiqueta: "En local" },
+  { valor: "entregado", etiqueta: "Entregado" },
+  { valor: "cancelado", etiqueta: "Cancelado" },
+];
+
 const colorEstado = (estado: string) => {
   if (estado === "pendiente") return "rgba(239, 68, 68, 0.05)";
   if (estado === "despachado" || estado === "en_local")
@@ -139,6 +147,15 @@ function ListarEncargos() {
   const [encargos, setEncargos] = useState<any[]>([]);
   const [mensaje, setMensaje] = useState("");
   const [abonos, setAbonos] = useState<{ [key: number]: string }>({});
+  const [tarjetasExpandidas, setTarjetasExpandidas] = useState<{
+    [key: number]: boolean;
+  }>({});
+  const [cambiandoEstadoIds, setCambiandoEstadoIds] = useState<{
+    [key: number]: boolean;
+  }>({});
+  const [registrandoAbonoIds, setRegistrandoAbonoIds] = useState<{
+    [key: number]: boolean;
+  }>({});
   const [buscar, setBuscar] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState("");
 
@@ -222,24 +239,41 @@ function ListarEncargos() {
     cargarEncargos(nuevoEstado);
   };
 
-  const cambiarEstado = async (encargoId: number, nuevoEstado: string) => {
-    const respuesta = await actualizarEstadoEncargoRequest(
-      encargoId,
-      nuevoEstado,
-    );
+  const toggleDetallesTarjeta = (encargoId: number) => {
+    setTarjetasExpandidas((prev) => ({
+      ...prev,
+      [encargoId]: !prev[encargoId],
+    }));
+  };
 
-    if (respuesta.id) {
-      setEncargos((prev) =>
-        prev.map((encargo) => (encargo.id === encargoId ? respuesta : encargo)),
+  const cambiarEstado = async (encargoId: number, nuevoEstado: string) => {
+    if (cambiandoEstadoIds[encargoId]) return;
+    setCambiandoEstadoIds((prev) => ({ ...prev, [encargoId]: true }));
+
+    try {
+      const respuesta = await actualizarEstadoEncargoRequest(
+        encargoId,
+        nuevoEstado,
       );
-    } else if (respuesta.detail) {
-      alert(respuesta.detail);
-    } else {
-      alert("Error al actualizar estado");
+
+      if (respuesta.id) {
+        setEncargos((prev) =>
+          prev.map((encargo) => (encargo.id === encargoId ? respuesta : encargo)),
+        );
+      } else if (respuesta.detail) {
+        alert(respuesta.detail);
+      } else {
+        alert("Error al actualizar estado");
+      }
+    } finally {
+      setCambiandoEstadoIds((prev) => ({ ...prev, [encargoId]: false }));
     }
   };
 
   const handleSelectEstado = (encargo: any, nuevoEstado: string) => {
+    if (encargo.estado === nuevoEstado) return;
+    if (cambiandoEstadoIds[encargo.id]) return;
+
     if (nuevoEstado === "despachado") {
       setModalEncargoId(encargo.id);
       setCostoBaseInput(encargo.costo_base !== null && encargo.costo_base !== undefined ? String(encargo.costo_base) : "");
@@ -464,29 +498,72 @@ function ListarEncargos() {
     setErrorPago("");
   };
 
-  const agregarAbono = async (encargoId: number) => {
-    const valor = Number(abonos[encargoId]);
+  const obtenerValorInputAbono = (encargo: any): string => {
+    const saldoActual = Number(encargo.saldo || 0);
+    if (saldoActual <= 0) return "0";
+    if (abonos[encargo.id] !== undefined) {
+      return abonos[encargo.id];
+    }
+    return String(saldoActual);
+  };
 
-    if (!valor || valor <= 0) {
-      alert("Ingresa un abono válido");
+  const agregarAbono = async (encargoId: number) => {
+    if (registrandoAbonoIds[encargoId]) return;
+
+    const encargoActual = encargos.find((e) => e.id === encargoId);
+    const saldoActual = Number(encargoActual?.saldo || 0);
+
+    if (saldoActual <= 0) {
+      alert("El saldo actual es $0. No se permite registrar otro abono.");
       return;
     }
 
-    const respuesta = await agregarAbonoEncargoRequest(encargoId, valor);
+    const textoAbono =
+      abonos[encargoId] !== undefined
+        ? abonos[encargoId]
+        : String(saldoActual);
+    const valor = Number(textoAbono);
 
-    if (respuesta.id) {
-      setEncargos((prev) =>
-        prev.map((encargo) => (encargo.id === encargoId ? respuesta : encargo)),
+    if (textoAbono.trim() === "" || isNaN(valor) || valor <= 0) {
+      alert("Ingresa un abono válido mayor a $0");
+      return;
+    }
+
+    if (valor > saldoActual) {
+      alert(
+        `El abono no puede superar el saldo actual (${formatearPesos(saldoActual)})`,
       );
+      return;
+    }
 
-      setAbonos((prev) => ({
-        ...prev,
-        [encargoId]: "",
-      }));
-    } else if (respuesta.detail) {
-      alert(respuesta.detail);
-    } else {
-      alert("Error al agregar abono");
+    const confirmar = window.confirm(
+      `¿Confirmas registrar un abono por ${formatearPesos(valor)}?\nSaldo actual del encargo: ${formatearPesos(saldoActual)}`,
+    );
+
+    if (!confirmar) return;
+
+    setRegistrandoAbonoIds((prev) => ({ ...prev, [encargoId]: true }));
+
+    try {
+      const respuesta = await agregarAbonoEncargoRequest(encargoId, valor);
+
+      if (respuesta.id) {
+        setEncargos((prev) =>
+          prev.map((encargo) => (encargo.id === encargoId ? respuesta : encargo)),
+        );
+
+        setAbonos((prev) => {
+          const copia = { ...prev };
+          delete copia[encargoId];
+          return copia;
+        });
+      } else if (respuesta.detail) {
+        alert(respuesta.detail);
+      } else {
+        alert("Error al agregar abono");
+      }
+    } finally {
+      setRegistrandoAbonoIds((prev) => ({ ...prev, [encargoId]: false }));
     }
   };
 
@@ -737,403 +814,558 @@ function ListarEncargos() {
       {mensaje && <p className="mensaje">{mensaje}</p>}
 
       <div className="encargos-grid">
-        {encargos.map((encargo) => (
-          <div
-            key={encargo.id}
-            className="card-encargo"
-            style={{
-              backgroundColor: colorEstado(encargo.estado),
-            }}
-          >
-            {/* 1. FOTO PROTAGONISTA CON BADGE DE ESTADO */}
-            <div className="card-foto-wrapper">
-              {encargo.foto ? (
-                <img
-                  src={
-                    encargo.foto?.startsWith("http")
-                      ? encargo.foto
-                      : `${import.meta.env.VITE_API_URL}${encargo.foto}`
-                  }
-                  alt={encargo.referencia}
-                  className="card-foto"
-                />
-              ) : (
-                <div className="card-foto-placeholder">📷 Sin imagen</div>
-              )}
-              <span className={`estado-badge estado-${encargo.estado} estado-badge-overlay`}>
-                {encargo.estado.replace("_", " ")}
-              </span>
-            </div>
+        {encargos.map((encargo) => {
+          const saldoActual = Number(encargo.saldo || 0);
+          const costoTotalActual = Number(encargo.costo_total || 0);
+          const entregaBloqueada = saldoActual > 0 || costoTotalActual <= 0;
+          const motivoBloqueoEntrega =
+            saldoActual > 0
+              ? "No se puede entregar un encargo con saldo pendiente."
+              : costoTotalActual <= 0
+                ? "No se puede entregar un encargo sin registrar costos válidos (costo total debe ser mayor a 0)."
+                : "";
+          const estaExpandida = Boolean(tarjetasExpandidas[encargo.id]);
+          const permiteAbono =
+            saldoActual > 0 &&
+            encargo.estado !== "cancelado" &&
+            encargo.estado !== "entregado";
 
-            {/* 2. REFERENCIA E ID + ACCIONES RÁPIDAS DE CABECERA */}
-            <div className="card-header">
-              <div>
-                <h3>
-                  #{encargo.id} - {encargo.referencia}
-                </h3>
-              </div>
-
-              {encargo.estado !== "entregado" &&
-                encargo.estado !== "cancelado" && (
-                  <div className="acciones-header">
-                    <button
-                      className="btn btn-primary"
-                      title="Editar encargo"
-                      onClick={() => abrirEdicion(encargo)}
-                    >
-                      ✏️
-                    </button>
-
-                    <button
-                      className="btn btn-danger"
-                      title="Cancelar encargo"
-                      onClick={() => handleSelectEstado(encargo, "cancelado")}
-                    >
-                      ❌
-                    </button>
-                  </div>
-                )}
-            </div>
-
-            {/* EDITOR EN LÍNEA SI ESTÁ ACTIVO */}
-            {encargoEditando?.id === encargo.id && (
-              <div className="editor">
-                <h2>Editando encargo #{encargoEditando.id}</h2>
-
-                <div className="editor-grid">
-                  <div>
-                    <label>Proveedor</label>
-                    <select
-                      value={editProveedorId}
-                      onChange={(e) => setEditProveedorId(e.target.value)}
-                    >
-                      <option value="">Sin proveedor</option>
-                      {proveedores.map((proveedor) => (
-                        <option key={proveedor.id} value={proveedor.id}>
-                          {proveedor.nombre} - {proveedor.telefono}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label>Referencia</label>
-                    <input
-                      value={editReferencia}
-                      onChange={(e) => setEditReferencia(e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label>Talla COL (Auto)</label>
-                    <input
-                      value={editTallaCol}
-                      readOnly
-                      style={{ backgroundColor: "#f3f4f6", color: "#374151", cursor: "not-allowed" }}
-                    />
-                  </div>
-
-                  <div>
-                    <label>Talla EUR</label>
-                    <select
-                      value={editTallaEur}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setEditTallaEur(val);
-                        setEditTallaCol(MAPPING_TALLAS[val] || "");
-                      }}
-                    >
-                      <option value="">Selecciona talla EUR</option>
-                      {OPCIONES_TALLA_EUR.map((size) => (
-                        <option key={size} value={size}>
-                          {size}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label>Precio</label>
-                    <input
-                      value={editPrecio}
-                      onChange={(e) => setEditPrecio(e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label>Fecha estimada</label>
-                    <input
-                      type="date"
-                      value={editFechaEntrega}
-                      onChange={(e) => setEditFechaEntrega(e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label>Observaciones</label>
-                    <textarea
-                      value={editObservaciones}
-                      onChange={(e) => setEditObservaciones(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label>Cambiar foto</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setEditFoto(e.target.files?.[0] || null)}
+          return (
+            <div
+              key={encargo.id}
+              className={`card-encargo ${estaExpandida ? "card-expandida" : ""}`}
+              style={{
+                backgroundColor: colorEstado(encargo.estado),
+              }}
+            >
+              {/* 1. FOTOGRAFÍA DEL PRODUCTO */}
+              <div className="card-foto-wrapper">
+                {encargo.foto ? (
+                  <img
+                    src={
+                      encargo.foto?.startsWith("http")
+                        ? encargo.foto
+                        : `${import.meta.env.VITE_API_URL}${encargo.foto}`
+                    }
+                    alt={encargo.referencia}
+                    className="card-foto"
                   />
-                </div>
-
-                <div className="acciones">
-                  <button className="btn btn-primary" onClick={guardarEdicion}>
-                    Guardar cambios
-                  </button>
-
-                  <button
-                    className="btn btn-secondary"
-                    onClick={() => setEncargoEditando(null)}
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <div className="card-body">
-              {/* 3. TALLAS COL / EUR */}
-              <div className="card-talla-row">
-                <span className="talla-badge">COL {encargo.talla_col}</span>
-                <span className="talla-badge eur">EUR {encargo.talla_eur}</span>
-              </div>
-
-              {/* 4. CLIENTE & PROVEEDOR */}
-              <div className="card-persona-info">
-                <p title={encargo.cliente?.nombre}>
-                  <strong>👤 Cliente:</strong> {encargo.cliente?.nombre || "Sin nombre"}
-                </p>
-                {encargo.cliente?.telefono && (
-                  <p>
-                    <strong>💬 WA:</strong>{" "}
-                    <a
-                      href={`https://wa.me/${encargo.cliente.telefono.replace(/[^0-9]/g, "")}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      {encargo.cliente.telefono}
-                    </a>
-                  </p>
-                )}
-                <p title={encargo.proveedor?.nombre}>
-                  <strong>📦 Prov:</strong> {encargo.proveedor?.nombre || "Sin proveedor"}
-                </p>
-              </div>
-
-              {/* 4b. ESTADO DE NOTIFICACIONES WHATSAPP (cliente y proveedor por separado) */}
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", margin: "4px 0 8px" }}>
-                <BadgeWhatsapp etiqueta="Cliente" info={encargo.whatsapp_cliente} />
-                <BadgeWhatsapp etiqueta="Proveedor" info={encargo.whatsapp_proveedor} />
-              </div>
-
-              {/* 5. PRECIO, ABONO Y SALDO */}
-              <div className="card-finanzas-grid">
-                <div>
-                  <span>Precio</span>
-                  <strong>{formatearPesos(encargo.precio)}</strong>
-                </div>
-                <div>
-                  <span>Abono</span>
-                  <strong>{formatearPesos(encargo.abono)}</strong>
-                </div>
-                <div className={Number(encargo.saldo) > 0 ? "saldo-destacado" : ""}>
-                  <span>Saldo</span>
-                  <strong>{formatearPesos(encargo.saldo)}</strong>
-                </div>
-              </div>
-
-              {/* 6. COSTOS Y UTILIDAD */}
-              {Number(encargo.costo_total || 0) > 0 ? (
-                <div className="card-costos-box">
-                  <div className="costos-mini">
-                    <span>Base: ${encargo.costo_base}</span>
-                    <span>Env: ${encargo.costo_envio}</span>
-                    <span>Desp: ${encargo.costo_despachador}</span>
-                  </div>
-                  <div className="costo-total-line">
-                    <span>C. Total: {formatearPesos(Number(encargo.costo_total || 0))}</span>
-                    <span
-                      style={{
-                        color: Number(encargo.utilidad_estimada || 0) >= 0 ? "#34d399" : "#f87171",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      Util: {formatearPesos(Number(encargo.utilidad_estimada || 0))}
-                    </span>
-                  </div>
-                  {encargo.estado !== "cancelado" && (
-                    <button
-                      className="btn btn-secondary"
-                      style={{
-                        marginTop: "6px",
-                        width: "100%",
-                        fontSize: "0.75rem",
-                        padding: "4px 8px",
-                        background: "rgba(245, 158, 11, 0.15)",
-                        border: "1px solid rgba(245, 158, 11, 0.4)",
-                        color: "var(--text-primary)",
-                      }}
-                      title="Modificar costos directos"
-                      onClick={() => abrirModalCostos(encargo)}
-                    >
-                      🏷️ Editar costos
-                    </button>
-                  )}
-                </div>
-              ) : (
-                encargo.estado !== "cancelado" && (
-                  <div style={{ marginBottom: "6px" }}>
-                    <button
-                      className="btn btn-secondary"
-                      style={{
-                        width: "100%",
-                        fontSize: "0.75rem",
-                        padding: "4px 8px",
-                        background: "rgba(245, 158, 11, 0.1)",
-                        border: "1px dashed rgba(245, 158, 11, 0.3)",
-                      }}
-                      title="Registrar costos directos"
-                      onClick={() => abrirModalCostos(encargo)}
-                    >
-                      🏷️ Asignar costos
-                    </button>
-                  </div>
-                )
-              )}
-
-              {/* FECHAS Y METADATA */}
-              <div className="card-fechas-info">
-                <span>📅 Creado: {encargo.fecha_creacion}</span>
-                {encargo.fecha_entrega_estimada && <span>⏳ Est: {encargo.fecha_entrega_estimada}</span>}
-                {encargo.fecha_despacho && <span>🚚 Desp: {encargo.fecha_despacho}</span>}
-                {encargo.fecha_entregado && <span>✅ Entregado: {encargo.fecha_entregado}</span>}
-                {encargo.metodo_pago && (
-                  <span>
-                    💳 Pago: <strong className="metodo-pago-tag">{encargo.metodo_pago}</strong>
-                  </span>
-                )}
-                {encargo.motivo_cancelacion && (
-                  <span className="txt-danger">❌ Cancel: {encargo.motivo_cancelacion}</span>
+                ) : (
+                  <div className="card-foto-placeholder">📷 Sin imagen</div>
                 )}
               </div>
 
-              {/* 7. ACCIONES DE ABONO, REENVÍO Y CAMBIO DE ESTADO */}
-              <div className="card-acciones">
-                {encargo.saldo > 0 &&
-                  encargo.estado !== "cancelado" &&
-                  encargo.estado !== "entregado" && (
-                    <div className="abono-input-row">
-                      <input
-                        placeholder="Nuevo abono $"
-                        value={abonos[encargo.id] || ""}
-                        onChange={(e) =>
-                          setAbonos((prev) => ({
-                            ...prev,
-                            [encargo.id]: e.target.value,
-                          }))
-                        }
-                      />
+              {/* 2. REFERENCIA DEL PRODUCTO (SIN #ID) + 9. EDITAR Y ELIMINAR */}
+              <div className="card-header">
+                <div className="card-title-wrap">
+                  <h3 title={encargo.referencia}>{encargo.referencia}</h3>
+                </div>
+
+                {encargo.estado !== "entregado" &&
+                  encargo.estado !== "cancelado" && (
+                    <div className="acciones-header">
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        title="Editar encargo"
+                        onClick={() => abrirEdicion(encargo)}
+                      >
+                        ✏️
+                      </button>
 
                       <button
-                        className="btn btn-secondary"
-                        onClick={() => agregarAbono(encargo.id)}
+                        type="button"
+                        className="btn btn-danger"
+                        title="Cancelar encargo"
+                        onClick={() => handleSelectEstado(encargo, "cancelado")}
                       >
-                        + Abono
+                        ❌
                       </button>
                     </div>
                   )}
+              </div>
 
-                {encargo.estado === "pendiente" &&
-                  (encargoReenviando === encargo.id ? (
-                    <div className="reenvio-container">
+              {/* EDITOR EN LÍNEA SI ESTÁ ACTIVO */}
+              {encargoEditando?.id === encargo.id && (
+                <div className="editor">
+                  <h2>Editando encargo #{encargoEditando.id}</h2>
+
+                  <div className="editor-grid">
+                    <div>
+                      <label>Proveedor</label>
                       <select
-                        value={proveedorSeleccionadoReenvio}
-                        onChange={(e) => setProveedorSeleccionadoReenvio(e.target.value)}
+                        value={editProveedorId}
+                        onChange={(e) => setEditProveedorId(e.target.value)}
                       >
-                        <option value="">
-                          {encargo.proveedor
-                            ? `Usar (${encargo.proveedor.nombre})`
-                            : "Seleccionar proveedor..."}
-                        </option>
-                        {proveedores.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.nombre}
+                        <option value="">Sin proveedor</option>
+                        {proveedores.map((proveedor) => (
+                          <option key={proveedor.id} value={proveedor.id}>
+                            {proveedor.nombre} - {proveedor.telefono}
                           </option>
                         ))}
                       </select>
-                      <div className="reenvio-acciones">
-                        <button
-                          className="btn btn-primary"
-                          onClick={() => reenviarAlProveedor(encargo)}
-                        >
-                          OK
-                        </button>
-                        <button
-                          className="btn btn-secondary"
-                          onClick={() => {
-                            setEncargoReenviando(null);
-                            setProveedorSeleccionadoReenvio("");
-                          }}
-                        >
-                          X
-                        </button>
-                      </div>
                     </div>
-                  ) : (
-                    <div className="acciones-reenvio-grupo">
-                      <button
-                        className="btn btn-primary"
-                        onClick={() => {
-                          setEncargoReenviando(encargo.id);
-                          setProveedorSeleccionadoReenvio("");
+
+                    <div>
+                      <label>Referencia</label>
+                      <input
+                        value={editReferencia}
+                        onChange={(e) => setEditReferencia(e.target.value)}
+                      />
+                    </div>
+
+                    <div>
+                      <label>Talla COL (Auto)</label>
+                      <input
+                        value={editTallaCol}
+                        readOnly
+                        style={{
+                          backgroundColor: "#f3f4f6",
+                          color: "#374151",
+                          cursor: "not-allowed",
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <label>Talla EUR</label>
+                      <select
+                        value={editTallaEur}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setEditTallaEur(val);
+                          setEditTallaCol(MAPPING_TALLAS[val] || "");
                         }}
                       >
-                        <span className="btn-text-full">📲 Reenviar a proveedor</span>
-                        <span className="btn-text-mobile">📲 Proveedor</span>
-                      </button>
-                      <button
-                        className="btn btn-secondary"
-                        onClick={() => reenviarAlCliente(encargo)}
-                      >
-                        <span className="btn-text-full">💬 Reenviar a cliente</span>
-                        <span className="btn-text-mobile">💬 Cliente</span>
-                      </button>
+                        <option value="">Selecciona talla EUR</option>
+                        {OPCIONES_TALLA_EUR.map((size) => (
+                          <option key={size} value={size}>
+                            {size}
+                          </option>
+                        ))}
+                      </select>
                     </div>
-                  ))}
 
-                <select
-                  value={encargo.estado}
-                  onChange={(e) => handleSelectEstado(encargo, e.target.value)}
+                    <div>
+                      <label>Precio</label>
+                      <input
+                        value={editPrecio}
+                        onChange={(e) => setEditPrecio(e.target.value)}
+                      />
+                    </div>
+
+                    <div>
+                      <label>Fecha estimada</label>
+                      <input
+                        type="date"
+                        value={editFechaEntrega}
+                        onChange={(e) => setEditFechaEntrega(e.target.value)}
+                      />
+                    </div>
+
+                    <div>
+                      <label>Observaciones</label>
+                      <textarea
+                        value={editObservaciones}
+                        onChange={(e) => setEditObservaciones(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label>Cambiar foto</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => setEditFoto(e.target.files?.[0] || null)}
+                    />
+                  </div>
+
+                  <div className="acciones">
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={guardarEdicion}
+                    >
+                      Guardar cambios
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => setEncargoEditando(null)}
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="card-body">
+                {/* 3. TALLAS Y 4. ESTADO ACTUAL DEL ENCARGO */}
+                <div className="card-talla-estado-row">
+                  <div className="card-talla-row">
+                    <span className="talla-badge eur">EUR {encargo.talla_eur}</span>
+                    {encargo.talla_col && (
+                      <span className="talla-badge">COL {encargo.talla_col}</span>
+                    )}
+                  </div>
+                  <span className={`estado-badge estado-${encargo.estado}`}>
+                    {encargo.estado.replace("_", " ")}
+                  </span>
+                </div>
+
+                {/* 5. DATOS DEL CLIENTE */}
+                <div className="card-persona-info">
+                  <p title={encargo.cliente?.nombre}>
+                    <strong>Cliente:</strong>{" "}
+                    {encargo.cliente?.nombre || "Sin nombre"}
+                  </p>
+                  <p>
+                    <strong>WhatsApp:</strong>{" "}
+                    {encargo.cliente?.telefono ? (
+                      <a
+                        href={`https://wa.me/${encargo.cliente.telefono.replace(/[^0-9]/g, "")}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {encargo.cliente.telefono}
+                      </a>
+                    ) : (
+                      <span>Sin teléfono</span>
+                    )}
+                  </p>
+                </div>
+
+                {/* 6. SALDO */}
+                <div
+                  className={`card-saldo-box ${
+                    saldoActual > 0 ? "saldo-positivo" : "saldo-cero"
+                  }`}
                 >
-                  <option value="pendiente">Pendiente</option>
-                  <option value="despachado">Despachado</option>
-                  <option value="en_local">En local</option>
-                  <option
-                    value="entregado"
-                    disabled={Number(encargo.saldo || 0) > 0 || Number(encargo.costo_total || 0) <= 0}
-                  >
-                    Entregado{" "}
-                    {Number(encargo.saldo || 0) > 0 || Number(encargo.costo_total || 0) <= 0
-                      ? "(Bloqueado)"
-                      : ""}
-                  </option>
-                  <option value="cancelado">Cancelado</option>
-                </select>
+                  <span className="card-saldo-label">Saldo</span>
+                  <strong className="card-saldo-valor">
+                    {saldoActual <= 0 ? "$0" : formatearPesos(saldoActual)}
+                  </strong>
+                </div>
+
+                {/* 7. REGISTRAR ABONO */}
+                {encargo.estado !== "cancelado" && (
+                  <div className="abono-input-row">
+                    <input
+                      type="number"
+                      min="1"
+                      max={saldoActual > 0 ? saldoActual : 0}
+                      placeholder="Abono $"
+                      disabled={
+                        !permiteAbono || Boolean(registrandoAbonoIds[encargo.id])
+                      }
+                      value={obtenerValorInputAbono(encargo)}
+                      onChange={(e) =>
+                        setAbonos((prev) => ({
+                          ...prev,
+                          [encargo.id]: e.target.value,
+                        }))
+                      }
+                    />
+
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-registrar-abono"
+                      disabled={
+                        !permiteAbono || Boolean(registrandoAbonoIds[encargo.id])
+                      }
+                      onClick={() => agregarAbono(encargo.id)}
+                    >
+                      + Abono
+                    </button>
+                  </div>
+                )}
+
+                {/* 8. CAMBIO RÁPIDO DE ESTADO MEDIANTE BOTONES */}
+                <div
+                  className="card-estados-botones"
+                  role="group"
+                  aria-label="Cambiar estado del encargo"
+                >
+                  {OPCIONES_ESTADO_TARJETA.map((op) => {
+                    const esEstadoActual = encargo.estado === op.valor;
+                    const esEntregadoBloqueado =
+                      op.valor === "entregado" &&
+                      !esEstadoActual &&
+                      entregaBloqueada;
+
+                    return (
+                      <button
+                        key={op.valor}
+                        type="button"
+                        aria-pressed={esEstadoActual}
+                        aria-disabled={
+                          esEntregadoBloqueado ||
+                          Boolean(cambiandoEstadoIds[encargo.id])
+                        }
+                        title={
+                          esEntregadoBloqueado
+                            ? motivoBloqueoEntrega
+                            : `Cambiar estado a ${op.etiqueta}`
+                        }
+                        className={`btn-estado-card estado-card-${op.valor} ${
+                          esEstadoActual ? "activo" : ""
+                        } ${esEntregadoBloqueado ? "bloqueado" : ""}`}
+                        onClick={() => handleSelectEstado(encargo, op.valor)}
+                      >
+                        {esEntregadoBloqueado ? `🔒 ${op.etiqueta}` : op.etiqueta}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* BOTÓN VER MÁS / VER MENOS DETALLES */}
+                <button
+                  type="button"
+                  className={`btn-ver-detalles ${estaExpandida ? "expandido" : ""}`}
+                  aria-expanded={estaExpandida}
+                  onClick={() => toggleDetallesTarjeta(encargo.id)}
+                >
+                  {estaExpandida
+                    ? "Ver menos detalles ↑"
+                    : "Ver más detalles ↓"}
+                </button>
+
+                {/* SECCIÓN EXPANDIBLE: VER MÁS DETALLES */}
+                {estaExpandida && (
+                  <div className="card-detalles-expandibles">
+                    {/* Proveedor */}
+                    <div className="detalle-proveedor-box">
+                      <p
+                        className="detalle-linea"
+                        title={encargo.proveedor?.nombre}
+                      >
+                        <strong>📦 Proveedor:</strong>{" "}
+                        {encargo.proveedor?.nombre || "Sin proveedor"}
+                      </p>
+                      {encargo.proveedor?.telefono && (
+                        <p className="detalle-linea">
+                          <strong>📞 Tel. Proveedor:</strong>{" "}
+                          {encargo.proveedor.telefono}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Estados de WhatsApp */}
+                    <div className="detalle-whatsapp-badges">
+                      <BadgeWhatsapp
+                        etiqueta="Cliente"
+                        info={encargo.whatsapp_cliente}
+                      />
+                      <BadgeWhatsapp
+                        etiqueta="Proveedor"
+                        info={encargo.whatsapp_proveedor}
+                      />
+                    </div>
+
+                    {/* Precio total y Abono acumulado */}
+                    <div className="card-finanzas-grid">
+                      <div>
+                        <span>Precio total</span>
+                        <strong>
+                          {formatearPesos(Number(encargo.precio || 0))}
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Abono acum.</span>
+                        <strong>
+                          {formatearPesos(Number(encargo.abono || 0))}
+                        </strong>
+                      </div>
+                      <div className={saldoActual > 0 ? "saldo-destacado" : ""}>
+                        <span>Saldo</span>
+                        <strong>
+                          {saldoActual <= 0 ? "$0" : formatearPesos(saldoActual)}
+                        </strong>
+                      </div>
+                    </div>
+
+                    {/* Costos y Utilidad + Botón Asignar/Editar costos */}
+                    {costoTotalActual > 0 ? (
+                      <div className="card-costos-box">
+                        <div className="costos-mini">
+                          <span>
+                            Base: {formatearPesos(Number(encargo.costo_base || 0))}
+                          </span>
+                          <span>
+                            Envío: {formatearPesos(Number(encargo.costo_envio || 0))}
+                          </span>
+                          <span>
+                            Desp:{" "}
+                            {formatearPesos(
+                              Number(encargo.costo_despachador || 0),
+                            )}
+                          </span>
+                        </div>
+                        <div className="costo-total-line">
+                          <span>
+                            C. Total: {formatearPesos(costoTotalActual)}
+                          </span>
+                          <span
+                            style={{
+                              color:
+                                Number(encargo.utilidad_estimada || 0) >= 0
+                                  ? "#34d399"
+                                  : "#f87171",
+                              fontWeight: "bold",
+                            }}
+                          >
+                            Utilidad:{" "}
+                            {formatearPesos(
+                              Number(encargo.utilidad_estimada || 0),
+                            )}
+                          </span>
+                        </div>
+                        {encargo.estado !== "cancelado" && (
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-costos-accion"
+                            title="Modificar costos directos"
+                            onClick={() => abrirModalCostos(encargo)}
+                          >
+                            🏷️ Editar costos
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      encargo.estado !== "cancelado" && (
+                        <div className="card-costos-box card-costos-vacio">
+                          <div className="costos-mini">
+                            <span>Base: $0</span>
+                            <span>Envío: $0</span>
+                            <span>Desp: $0</span>
+                          </div>
+                          <div className="costo-total-line">
+                            <span>C. Total: $0</span>
+                            <span>Utilidad: $0</span>
+                          </div>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-costos-accion"
+                            title="Registrar costos directos"
+                            onClick={() => abrirModalCostos(encargo)}
+                          >
+                            🏷️ Asignar costos
+                          </button>
+                        </div>
+                      )
+                    )}
+
+                    {/* Fechas y Metadata adicional */}
+                    <div className="card-fechas-info">
+                      <span>📅 Creado: {encargo.fecha_creacion}</span>
+                      {encargo.fecha_entrega_estimada && (
+                        <span>
+                          ⏳ Entrega est.: {encargo.fecha_entrega_estimada}
+                        </span>
+                      )}
+                      {encargo.fecha_despacho && (
+                        <span>🚚 Despacho: {encargo.fecha_despacho}</span>
+                      )}
+                      {encargo.fecha_entregado && (
+                        <span>✅ Entregado: {encargo.fecha_entregado}</span>
+                      )}
+                      {encargo.fecha_cancelacion && (
+                        <span>🗓️ Cancelado: {encargo.fecha_cancelacion}</span>
+                      )}
+                      {encargo.metodo_pago && (
+                        <span>
+                          💳 Pago:{" "}
+                          <strong className="metodo-pago-tag">
+                            {encargo.metodo_pago}
+                          </strong>
+                        </span>
+                      )}
+                      {encargo.motivo_cancelacion && (
+                        <span className="txt-danger">
+                          ❌ Cancelación: {encargo.motivo_cancelacion}
+                        </span>
+                      )}
+                      {encargo.observaciones && (
+                        <span>📝 Obs.: {encargo.observaciones}</span>
+                      )}
+                    </div>
+
+                    {/* Botones de reenvío a proveedor y cliente */}
+                    {encargo.estado === "pendiente" &&
+                      (encargoReenviando === encargo.id ? (
+                        <div className="reenvio-container">
+                          <select
+                            value={proveedorSeleccionadoReenvio}
+                            onChange={(e) =>
+                              setProveedorSeleccionadoReenvio(e.target.value)
+                            }
+                          >
+                            <option value="">
+                              {encargo.proveedor
+                                ? `Usar (${encargo.proveedor.nombre})`
+                                : "Seleccionar proveedor..."}
+                            </option>
+                            {proveedores.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.nombre}
+                              </option>
+                            ))}
+                          </select>
+                          <div className="reenvio-acciones">
+                            <button
+                              type="button"
+                              className="btn btn-primary"
+                              onClick={() => reenviarAlProveedor(encargo)}
+                            >
+                              OK
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              onClick={() => {
+                                setEncargoReenviando(null);
+                                setProveedorSeleccionadoReenvio("");
+                              }}
+                            >
+                              X
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="acciones-reenvio-grupo">
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={() => {
+                              setEncargoReenviando(encargo.id);
+                              setProveedorSeleccionadoReenvio("");
+                            }}
+                          >
+                            <span className="btn-text-full">
+                              📲 Reenviar a proveedor
+                            </span>
+                            <span className="btn-text-mobile">📲 Proveedor</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            onClick={() => reenviarAlCliente(encargo)}
+                          >
+                            <span className="btn-text-full">
+                              💬 Reenviar a cliente
+                            </span>
+                            <span className="btn-text-mobile">💬 Cliente</span>
+                          </button>
+                        </div>
+                      ))}
+                  </div>
+                )}
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {showCostoModal && (

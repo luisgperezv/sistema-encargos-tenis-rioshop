@@ -158,6 +158,7 @@
 .encargos-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: start;
   gap: 1.25rem;
   width: 100%;
   margin-bottom: 2rem;
@@ -177,10 +178,10 @@
   }
 }
 
-@media (max-width: 500px) {
+@media (max-width: 560px) {
   .encargos-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.5rem;
+    grid-template-columns: 1fr;
+    gap: 0.85rem;
   }
 }
 
@@ -189,7 +190,7 @@
   display: flex;
   flex-direction: column;
   border-radius: var(--radius-lg);
-  padding: 1rem;
+  padding: 0.85rem;
   box-shadow: var(--shadow-md);
   border: 1px solid var(--glass-border);
   backdrop-filter: blur(12px);
@@ -197,6 +198,7 @@
   transition: transform var(--transition-fast), box-shadow var(--transition-fast);
   box-sizing: border-box;
   overflow: hidden;
+  min-width: 0;
 }
 
 .card-encargo:hover {
@@ -212,7 +214,7 @@
   height: 160px;
   border-radius: var(--radius-md);
   overflow: hidden;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.65rem;
   background: rgba(17, 24, 39, 0.5);
   display: flex;
   align-items: center;
@@ -255,16 +257,21 @@
 .card-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  gap: 0.5rem;
-  padding-bottom: 0.5rem;
-  margin-bottom: 0.5rem;
+  align-items: center;
+  gap: 0.45rem;
+  padding-bottom: 0.45rem;
+  margin-bottom: 0.45rem;
   border-bottom: 1px dashed var(--border-color);
+}
+
+.card-title-wrap {
+  flex: 1;
+  min-width: 0;
 }
 
 .card-header h3 {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--text-primary);
   line-height: 1.25;
@@ -273,12 +280,13 @@
 
 .estado-badge {
   display: inline-block;
-  padding: 0.25rem 0.5rem;
+  padding: 0.2rem 0.5rem;
   border-radius: var(--radius-full);
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 
 .estado-pendiente { background: rgba(239, 68, 68, 0.15) !important; color: #f87171 !important; border: 1px solid rgba(239, 68, 68, 0.3); }
@@ -290,14 +298,15 @@
 
 .acciones-header {
   display: flex;
-  gap: 0.35rem;
+  gap: 0.3rem;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .acciones-header .btn {
-  height: 2rem;
-  padding: 0 0.6rem;
-  font-size: 0.78rem;
+  height: 1.85rem;
+  padding: 0 0.5rem;
+  font-size: 0.75rem;
   border-radius: var(--radius-md);
   font-weight: 600;
   cursor: pointer;
@@ -328,15 +337,25 @@
 .card-body {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.45rem;
   flex: 1;
+  min-width: 0;
 }
 
 /* COMPONENTES COMPACTOS DE TARJETA EN GRID */
+.card-talla-estado-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
 .card-talla-row {
   display: flex;
-  gap: 0.4rem;
-  margin-bottom: 0.35rem;
+  gap: 0.35rem;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .talla-badge {
@@ -345,7 +364,7 @@
   border: 1px solid rgba(37, 99, 235, 0.3);
   padding: 0.15rem 0.4rem;
   border-radius: var(--radius-sm);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 700;
 }
 
@@ -358,9 +377,8 @@
 .card-persona-info {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: 0.18rem;
   font-size: 0.78rem;
-  margin-bottom: 0.4rem;
   color: var(--text-secondary);
 }
 
@@ -374,6 +392,178 @@
 .card-persona-info a {
   color: var(--accent-blue);
   text-decoration: none;
+  font-weight: 600;
+}
+
+.card-persona-info a:hover {
+  text-decoration: underline;
+}
+
+/* CAJA COMPACTA DE SALDO */
+.card-saldo-box {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  background: rgba(17, 24, 39, 0.5);
+}
+
+.card-saldo-box.saldo-positivo {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.card-saldo-box.saldo-cero {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.card-saldo-label {
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.card-saldo-valor {
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.card-saldo-box.saldo-positivo .card-saldo-valor {
+  color: #f87171;
+}
+
+.card-saldo-box.saldo-cero .card-saldo-valor {
+  color: #34d399;
+}
+
+/* CAMBIO RÁPIDO DE ESTADO MEDIANTE BOTONES EN TARJETA */
+.card-estados-botones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.28rem;
+  width: 100%;
+}
+
+.btn-estado-card {
+  flex: 1 1 calc(33.333% - 0.28rem);
+  min-width: 0;
+  padding: 0.32rem 0.25rem;
+  border-radius: var(--radius-md);
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+  background: rgba(17, 24, 39, 0.6);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.btn-estado-card:hover:not(.bloqueado):not(.activo) {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.btn-estado-card.estado-card-pendiente.activo {
+  background: rgba(239, 68, 68, 0.22);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.55);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.2);
+}
+
+.btn-estado-card.estado-card-despachado.activo {
+  background: rgba(245, 158, 11, 0.22);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.55);
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.2);
+}
+
+.btn-estado-card.estado-card-en_local.activo {
+  background: rgba(245, 158, 11, 0.28);
+  color: #fcd34d;
+  border-color: rgba(245, 158, 11, 0.65);
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.25);
+}
+
+.btn-estado-card.estado-card-entregado.activo {
+  background: rgba(16, 185, 129, 0.22);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.55);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.2);
+}
+
+.btn-estado-card.estado-card-cancelado.activo {
+  background: rgba(107, 114, 128, 0.25);
+  color: #e5e7eb;
+  border-color: rgba(156, 163, 175, 0.55);
+}
+
+.btn-estado-card.bloqueado {
+  opacity: 0.5;
+  border-style: dashed;
+  cursor: not-allowed;
+}
+
+/* BOTÓN Y SECCIÓN EXPANDIBLE VER MÁS DETALLES */
+.btn-ver-detalles {
+  width: 100%;
+  margin-top: 0.15rem;
+  padding: 0.38rem 0.6rem;
+  border-radius: var(--radius-md);
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px dashed var(--border-color);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: center;
+}
+
+.btn-ver-detalles:hover,
+.btn-ver-detalles.expandido {
+  color: var(--text-primary);
+  background: rgba(37, 99, 235, 0.12);
+  border-color: rgba(37, 99, 235, 0.4);
+}
+
+.card-detalles-expandibles {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-top: 0.25rem;
+  padding-top: 0.55rem;
+  border-top: 1px dashed var(--border-color);
+  animation: fadeIn var(--transition-fast);
+}
+
+.detalle-proveedor-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.detalle-linea {
+  margin: 0;
+  word-break: break-word;
+}
+
+.detalle-whatsapp-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
 }
 
 .card-finanzas-grid {
@@ -386,7 +576,6 @@
   border: 1px solid var(--border-color);
   font-size: 0.72rem;
   text-align: center;
-  margin-bottom: 0.4rem;
 }
 
 .card-finanzas-grid span {
@@ -408,10 +597,25 @@
 .card-costos-box {
   background: rgba(245, 158, 11, 0.08);
   border: 1px dashed rgba(245, 158, 11, 0.25);
-  padding: 0.35rem;
+  padding: 0.4rem;
   border-radius: var(--radius-sm);
   font-size: 0.68rem;
-  margin-bottom: 0.4rem;
+}
+
+.btn-costos-accion {
+  margin-top: 0.35rem;
+  width: 100%;
+  font-size: 0.74rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: var(--radius-sm);
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.btn-costos-accion:hover {
+  background: rgba(245, 158, 11, 0.25);
 }
 
 .costos-mini {
@@ -419,6 +623,7 @@
   justify-content: space-between;
   gap: 0.2rem;
   color: var(--text-secondary);
+  flex-wrap: wrap;
 }
 
 .costo-total-line {
@@ -426,6 +631,8 @@
   font-weight: 600;
   display: flex;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.2rem;
 }
 
 .card-fechas-info {
@@ -434,7 +641,6 @@
   gap: 0.15rem;
   font-size: 0.7rem;
   color: var(--text-secondary);
-  margin-bottom: 0.4rem;
 }
 
 .txt-danger {
@@ -461,21 +667,32 @@
 .abono-input-row {
   display: flex;
   gap: 0.3rem;
+  width: 100%;
 }
 
 .abono-input-row input {
   flex: 1;
-  height: 2rem;
+  height: 2.05rem;
   font-size: 0.78rem;
-  padding: 0 0.4rem;
+  padding: 0 0.45rem;
   min-width: 0;
+  border-radius: var(--radius-md);
+}
+
+.abono-input-row input:disabled,
+.abono-input-row button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .abono-input-row button {
-  height: 2rem;
-  padding: 0 0.5rem;
+  height: 2.05rem;
+  padding: 0 0.6rem;
   font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: var(--radius-md);
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .card-acciones select {
@@ -706,13 +923,14 @@
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .acciones-header {
-    width: 100%;
+    width: auto;
+    flex-shrink: 0;
   }
-  
+
   .acciones-header .btn {
-    flex: 1;
+    flex: 0 0 auto;
   }
 
   .btn-text-full {
@@ -724,20 +942,17 @@
   }
 
   .card-encargo {
-    padding: 0.75rem;
+    padding: 0.8rem;
     min-width: 0;
   }
 
   .card-header h3 {
-    font-size: 0.92rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    font-size: 0.95rem;
     min-width: 0;
   }
 
   .card-persona-info {
-    font-size: 0.73rem;
+    font-size: 0.78rem;
     min-width: 0;
   }
 
@@ -755,60 +970,63 @@
   }
 
   .abono-input-row {
-    gap: 0.25rem;
+    gap: 0.35rem;
     width: 100%;
   }
 
   .abono-input-row input {
     flex: 1;
     min-width: 0;
-    height: 1.9rem;
-    font-size: 0.72rem;
-    padding: 0 0.35rem;
+    height: 2.15rem;
+    font-size: 0.8rem;
+    padding: 0 0.5rem;
   }
 
   .abono-input-row button {
-    height: 1.9rem;
-    padding: 0 0.45rem;
-    font-size: 0.7rem;
+    height: 2.15rem;
+    padding: 0 0.65rem;
+    font-size: 0.78rem;
     white-space: nowrap;
     flex-shrink: 0;
   }
 
+  .btn-estado-card {
+    min-height: 2rem;
+    font-size: 0.74rem;
+    padding: 0.35rem 0.4rem;
+  }
+
+  .btn-ver-detalles {
+    min-height: 2.1rem;
+    font-size: 0.78rem;
+  }
+
   .acciones-reenvio-grupo {
     flex-direction: row;
-    gap: 0.25rem;
+    gap: 0.35rem;
     width: 100%;
   }
 
   .acciones-reenvio-grupo .btn {
     flex: 1;
     min-width: 0;
-    height: 1.9rem;
-    padding: 0 0.2rem;
-    font-size: 0.7rem;
-    box-sizing: border-box;
-  }
-
-  .card-acciones select {
-    height: 1.9rem;
-    font-size: 0.72rem;
+    height: 2rem;
     padding: 0 0.35rem;
-    width: 100%;
+    font-size: 0.75rem;
     box-sizing: border-box;
   }
 
   .card-finanzas-grid {
-    padding: 0.25rem;
-    font-size: 0.68rem;
-  }
-
-  .card-finanzas-grid strong {
+    padding: 0.3rem;
     font-size: 0.72rem;
   }
 
+  .card-finanzas-grid strong {
+    font-size: 0.76rem;
+  }
+
   .card-fechas-info {
-    font-size: 0.68rem;
+    font-size: 0.72rem;
   }
 }
 
