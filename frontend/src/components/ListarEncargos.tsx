@@ -109,6 +109,15 @@ const ORDEN_TALLAS = [
 
 const OPCIONES_TALLA_EUR = ORDEN_TALLAS;
 
+const OPCIONES_FILTRO_ESTADO = [
+  { valor: "", etiqueta: "Todos" },
+  { valor: "pendiente", etiqueta: "Pendiente" },
+  { valor: "despachado", etiqueta: "Despachado" },
+  { valor: "en_local", etiqueta: "En local" },
+  { valor: "entregado", etiqueta: "Entregado" },
+  { valor: "cancelado", etiqueta: "Cancelado" },
+];
+
 const colorEstado = (estado: string) => {
   if (estado === "pendiente") return "rgba(239, 68, 68, 0.05)";
   if (estado === "despachado" || estado === "en_local")
@@ -196,14 +205,21 @@ function ListarEncargos() {
       .reduce((total, encargo) => total + Number(encargo.saldo || 0), 0);
   })();
 
-  const cargarEncargos = async () => {
-    const data = await listarEncargosRequest(buscar, estadoFiltro);
+  const cargarEncargos = async (estadoOverride?: string) => {
+    const estadoAFiltrar =
+      typeof estadoOverride === "string" ? estadoOverride : estadoFiltro;
+    const data = await listarEncargosRequest(buscar, estadoAFiltrar);
 
     if (Array.isArray(data)) {
       setEncargos(data);
     } else {
       setMensaje("❌ Error al cargar encargos");
     }
+  };
+
+  const cambiarFiltroEstado = (nuevoEstado: string) => {
+    setEstadoFiltro(nuevoEstado);
+    cargarEncargos(nuevoEstado);
   };
 
   const cambiarEstado = async (encargoId: number, nuevoEstado: string) => {
@@ -641,27 +657,47 @@ function ListarEncargos() {
       <h1 className="encargos-title">Listado de Encargos</h1>
 
       <div className="filtros">
-        <input
-          placeholder="Buscar por cliente, teléfono, referencia o ID"
-          value={buscar}
-          onChange={(e) => setBuscar(e.target.value)}
-        />
+        <div className="filtros-busqueda">
+          <input
+            placeholder="Buscar por cliente, teléfono, referencia o ID"
+            value={buscar}
+            onChange={(e) => setBuscar(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                cargarEncargos();
+              }
+            }}
+          />
 
-        <select
-          value={estadoFiltro}
-          onChange={(e) => setEstadoFiltro(e.target.value)}
+          <button
+            type="button"
+            className="btn btn-primary btn-buscar"
+            onClick={() => cargarEncargos()}
+          >
+            Buscar
+          </button>
+        </div>
+
+        <div
+          className="filtros-estados"
+          role="group"
+          aria-label="Filtrar encargos por estado"
         >
-          <option value="">Todos los estados</option>
-          <option value="pendiente">Pendiente</option>
-          <option value="despachado">Despachado</option>
-          <option value="en_local">En local</option>
-          <option value="entregado">Entregado</option>
-          <option value="cancelado">Cancelado</option>
-        </select>
-
-        <button className="btn btn-primary" onClick={cargarEncargos}>
-          Buscar
-        </button>
+          {OPCIONES_FILTRO_ESTADO.map((opcion) => {
+            const activo = estadoFiltro === opcion.valor;
+            return (
+              <button
+                key={opcion.valor || "todos"}
+                type="button"
+                aria-pressed={activo}
+                className={`btn-filtro-estado ${activo ? "activo" : ""}`}
+                onClick={() => cambiarFiltroEstado(opcion.valor)}
+              >
+                {opcion.etiqueta}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <div className="dashboard-resumen">
