@@ -180,8 +180,8 @@
 
 @media (max-width: 560px) {
   .encargos-grid {
-    grid-template-columns: 1fr;
-    gap: 0.85rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
   }
 }
 
@@ -942,17 +942,17 @@
   }
 
   .card-encargo {
-    padding: 0.8rem;
+    padding: 0.75rem;
     min-width: 0;
   }
 
   .card-header h3 {
-    font-size: 0.95rem;
+    font-size: 0.92rem;
     min-width: 0;
   }
 
   .card-persona-info {
-    font-size: 0.78rem;
+    font-size: 0.74rem;
     min-width: 0;
   }
 
@@ -970,63 +970,247 @@
   }
 
   .abono-input-row {
-    gap: 0.35rem;
+    gap: 0.25rem;
     width: 100%;
   }
 
   .abono-input-row input {
-    flex: 1;
+    flex: 1 1 0;
+    width: 100%;
     min-width: 0;
-    height: 2.15rem;
-    font-size: 0.8rem;
-    padding: 0 0.5rem;
+    height: 1.9rem;
+    font-size: 0.74rem;
+    padding: 0 0.4rem;
+    appearance: textfield;
+    -moz-appearance: textfield;
+  }
+
+  .abono-input-row input::-webkit-outer-spin-button,
+  .abono-input-row input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
   }
 
   .abono-input-row button {
-    height: 2.15rem;
-    padding: 0 0.65rem;
-    font-size: 0.78rem;
+    height: 1.9rem;
+    padding: 0 0.48rem;
+    font-size: 0.72rem;
     white-space: nowrap;
     flex-shrink: 0;
   }
 
   .btn-estado-card {
-    min-height: 2rem;
-    font-size: 0.74rem;
-    padding: 0.35rem 0.4rem;
+    min-height: 1.85rem;
+    font-size: 0.68rem;
+    padding: 0.28rem 0.25rem;
   }
 
   .btn-ver-detalles {
-    min-height: 2.1rem;
-    font-size: 0.78rem;
+    min-height: 1.9rem;
+    font-size: 0.72rem;
+    padding: 0.3rem 0.45rem;
   }
 
   .acciones-reenvio-grupo {
     flex-direction: row;
-    gap: 0.35rem;
+    gap: 0.25rem;
     width: 100%;
   }
 
   .acciones-reenvio-grupo .btn {
     flex: 1;
     min-width: 0;
-    height: 2rem;
-    padding: 0 0.35rem;
-    font-size: 0.75rem;
+    height: 1.9rem;
+    padding: 0 0.25rem;
+    font-size: 0.7rem;
     box-sizing: border-box;
   }
 
   .card-finanzas-grid {
-    padding: 0.3rem;
-    font-size: 0.72rem;
+    padding: 0.25rem;
+    font-size: 0.68rem;
   }
 
   .card-finanzas-grid strong {
-    font-size: 0.76rem;
+    font-size: 0.72rem;
   }
 
   .card-fechas-info {
-    font-size: 0.72rem;
+    font-size: 0.68rem;
+  }
+}
+
+@media (max-width: 560px) {
+  .card-encargo {
+    padding: 0.55rem;
+    border-radius: var(--radius-md);
+  }
+
+  .card-foto-wrapper {
+    height: 120px;
+    margin-bottom: 0.45rem;
+  }
+
+  .card-header {
+    gap: 0.25rem;
+    padding-bottom: 0.35rem;
+    margin-bottom: 0.35rem;
+    align-items: flex-start;
+  }
+
+  .card-header h3 {
+    font-size: 0.8rem;
+    line-height: 1.2;
+  }
+
+  .acciones-header {
+    gap: 0.2rem;
+  }
+
+  .acciones-header .btn {
+    height: 1.55rem;
+    padding: 0 0.32rem;
+    font-size: 0.68rem;
+  }
+
+  .card-body {
+    gap: 0.35rem;
+  }
+
+  .card-talla-estado-row {
+    gap: 0.2rem;
+  }
+
+  .card-talla-row {
+    gap: 0.2rem;
+  }
+
+  .talla-badge {
+    font-size: 0.6rem;
+    padding: 0.1rem 0.28rem;
+  }
+
+  .estado-badge {
+    font-size: 0.56rem;
+    padding: 0.12rem 0.34rem;
+    letter-spacing: 0.02em;
+  }
+
+  .card-persona-info {
+    font-size: 0.68rem;
+    gap: 0.12rem;
+  }
+
+  .card-saldo-box {
+    padding: 0.3rem 0.42rem;
+  }
+
+  .card-saldo-label {
+    font-size: 0.62rem;
+  }
+
+  .card-saldo-valor {
+    font-size: 0.78rem;
+  }
+
+  .abono-input-row {
+    gap: 0.22rem;
+  }
+
+  .abono-input-row input {
+    height: 1.8rem;
+    font-size: 0.7rem;
+    padding: 0 0.32rem;
+  }
+
+  .abono-input-row button {
+    height: 1.8rem;
+    padding: 0 0.38rem;
+    font-size: 0.66rem;
+  }
+
+  .card-estados-botones {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.22rem;
+  }
+
+  .btn-estado-card {
+    flex: initial;
+    width: 100%;
+    min-height: 1.68rem;
+    font-size: 0.62rem;
+    padding: 0.22rem 0.15rem;
+  }
+
+  .btn-estado-card:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
+  .btn-ver-detalles {
+    min-height: 1.72rem;
+    font-size: 0.66rem;
+    padding: 0.22rem 0.35rem;
+  }
+
+  .card-detalles-expandibles {
+    gap: 0.35rem;
+    padding-top: 0.4rem;
+  }
+
+  .detalle-proveedor-box {
+    font-size: 0.66rem;
+  }
+
+  .detalle-whatsapp-badges {
+    gap: 0.22rem;
+  }
+
+  .detalle-whatsapp-badges span {
+    font-size: 0.6rem !important;
+    padding: 2px 5px !important;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .card-finanzas-grid {
+    padding: 0.22rem 0.12rem;
+    gap: 0.12rem;
+    font-size: 0.62rem;
+  }
+
+  .card-finanzas-grid span {
+    font-size: 0.54rem;
+  }
+
+  .card-finanzas-grid strong {
+    font-size: 0.64rem;
+    word-break: break-word;
+  }
+
+  .card-costos-box {
+    padding: 0.3rem;
+    font-size: 0.62rem;
+  }
+
+  .btn-costos-accion {
+    font-size: 0.66rem;
+    padding: 0.24rem 0.35rem;
+  }
+
+  .card-fechas-info {
+    font-size: 0.64rem;
+  }
+
+  .acciones-reenvio-grupo {
+    gap: 0.2rem;
+  }
+
+  .acciones-reenvio-grupo .btn {
+    height: 1.75rem;
+    padding: 0 0.2rem;
+    font-size: 0.64rem;
   }
 }
 
